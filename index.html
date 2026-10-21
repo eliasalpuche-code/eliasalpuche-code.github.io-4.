@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centros y Becarios</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{--fondo:#f3f5f2;--papel:#fff;--tinta:#1d2b26;--suave:#5d6b65;--linea:#d5dcd7;--acento:#1f6b52;--acento-t:#fff;--aviso:#a4402b;--ok:#1f6b52;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--fondo:#121815;--papel:#1b2420;--tinta:#e7eeea;--suave:#9baba3;--linea:#2e3b35;--acento:#4cc39b;--acento-t:#0d1a15;--aviso:#ff9b84;--ok:#4cc39b}}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--fondo);color:var(--tinta);line-height:1.45;padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0)}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;background:var(--papel);border-bottom:1px solid var(--linea)}
+h1{font-size:1.15rem;margin:0}h2{font-size:1.05rem;margin:0 0 10px}
+main{max-width:760px;margin:0 auto;padding:16px}
+.tarjeta{background:var(--papel);border:1px solid var(--linea);border-radius:10px;padding:16px;margin-bottom:14px}
+label{display:block;font-size:.9rem;color:var(--suave);margin:10px 0 4px}
+input,select,textarea{width:100%;font:inherit;padding:11px;border:1px solid var(--linea);border-radius:8px;background:var(--fondo);color:var(--tinta)}
+button{font:inherit;padding:11px 16px;border:0;border-radius:8px;background:var(--acento);color:var(--acento-t);cursor:pointer;min-height:44px}
+button.sec{background:transparent;color:var(--tinta);border:1px solid var(--linea)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acento);outline-offset:2px}
+.fila{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.centro{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--linea)}
+.centro:first-of-type{border-top:0}
+.cupo{font-size:.85rem;color:var(--suave)}
+#mensaje{position:sticky;top:0;z-index:5;padding:12px 16px;display:none;font-weight:600}
+#mensaje.ok{display:block;background:var(--ok);color:var(--acento-t)}
+#mensaje.error{display:block;background:var(--aviso);color:#fff}
+.oculto{display:none!important}
+nav{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.pie{font-size:.8rem;color:var(--suave);text-align:center;padding:20px}
+</style>
+</head>
+<body>
+<div id="mensaje" role="status"></div>
+<header><h1>Centros y Becarios</h1><div><span id="quien" class="cupo"></span> <button id="btnSalir" class="sec oculto">Cerrar sesión</button></div></header>
+<main>
+
+<section id="pantallaLogin" class="tarjeta">
+  <h2>Iniciar sesión</h2>
+  <p>Entra con tu cuenta de Google. Solo pueden usar el sistema las personas autorizadas por el administrador.</p>
+  <div id="botonGoogle"></div>
+</section>
+
+<section id="app" class="oculto">
+  <nav>
+    <button data-vista="centros">Centros</button>
+    <button data-vista="nuevoCentro" class="sec">Nuevo centro</button>
+    <button data-vista="nuevoBecario" class="sec">Nuevo becario</button>
+  </nav>
+
+  <div id="vCentros" class="tarjeta"><h2>Centros de trabajo</h2><div id="listaCentros"></div></div>
+
+  <div id="vDetalle" class="tarjeta oculto">
+    <button class="sec" id="btnVolver">Volver</button>
+    <h2 id="detNombre" style="margin-top:12px"></h2>
+    <p id="detEstado" class="cupo"></p>
+    <h2>Becarios asignados</h2><div id="detBecarios"></div>
+    <h2 style="margin-top:16px">Asignar becario a este centro</h2>
+    <label for="asBecario">Identificador del becario (por ejemplo BC-000001)</label>
+    <input id="asBecario" placeholder="BC-000001">
+    <label for="asMotivo">Motivo</label>
+    <input id="asMotivo" placeholder="Alta inicial, cambio solicitado, etc.">
+    <div class="fila"><button id="btnAsignar">Asignar becario</button></div>
+    <h2 style="margin-top:16px">Historial (kardex)</h2><div id="detKardex"></div>
+  </div>
+
+  <div id="vNuevoCentro" class="tarjeta oculto">
+    <h2>Nuevo centro de trabajo</h2>
+    <label for="cNombre">Nombre del centro *</label><input id="cNombre">
+    <label for="cTipo">Tipo</label><input id="cTipo">
+    <label for="cRespNombre">Nombre del responsable</label><input id="cRespNombre">
+    <label for="cCurp">CURP del responsable</label><input id="cCurp" maxlength="18" autocapitalize="characters">
+    <label for="cObs">Observaciones</label><textarea id="cObs" rows="2"></textarea>
+    <div class="fila"><button id="btnGuardarCentro">Guardar centro</button></div>
+  </div>
+
+  <div id="vNuevoBecario" class="tarjeta oculto">
+    <h2>Nuevo becario</h2>
+    <label for="bNombre">Nombre *</label><input id="bNombre">
+    <label for="bAp1">Primer apellido</label><input id="bAp1">
+    <label for="bAp2">Segundo apellido</label><input id="bAp2">
+    <label for="bCurp">CURP</label><input id="bCurp" maxlength="18" autocapitalize="characters">
+    <label for="bCorreo">Correo electrónico</label><input id="bCorreo" type="email">
+    <label for="bCel">Celular del becario</label><input id="bCel" type="tel">
+    <label for="bCelF">Celular del familiar</label><input id="bCelF" type="tel">
+    <div class="fila"><button id="btnGuardarBecario">Guardar becario</button></div>
+  </div>
+</section>
+</main>
+<p class="pie">Los datos se guardan en Google Sheets. Esta página no almacena información personal.</p>
+
+<script>
+/* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
+const URL_SCRIPT = https://script.google.com/macros/s/AKfycbzbEgp3KL3ApJyoc0CqVftdTTD28T9iDJIFDB-JhgVtlriTEosd1iz-UUY7Vv3t9ruY/exec;
+const CLIENT_ID  = 358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com;
+/* ========================================================= */
+
+let token = null;   // Solo en memoria; no se guarda en el navegador.
+const $ = id => document.getElementById(id);
+
+function aviso(texto, tipo){
+  const m = $('mensaje'); m.textContent = texto; m.className = tipo;
+  clearTimeout(aviso.t); aviso.t = setTimeout(() => m.className = '', 6000);
+}
+
+async function api(accion, datos){
+  if(!token){ aviso('Inicia sesión para continuar.', 'error'); throw new Error('sin sesión'); }
+  const r = await fetch(URL_SCRIPT, {
+    method: 'POST',
+    body: JSON.stringify({ accion, token, datos: datos || {} })   // sin cabeceras: evita bloqueo CORS
+  });
+  const j = await r.json();
+  if(!j.ok){
+    if(/Sesión no válida/.test(j.error)){ cerrarSesion(); aviso('Tu sesión venció. Vuelve a iniciar sesión.', 'error'); }
+    else aviso(j.error, 'error');
+    throw new Error(j.error);
+  }
+  return j.datos;
+}
+
+function alIniciar(resp){
+  token = resp.credential;
+  api('quienSoy').then(u => {
+    $('quien').textContent = u.nombre + ' (' + u.rol + ')';
+    $('pantallaLogin').classList.add('oculto');
+    $('app').classList.remove('oculto');
+    $('btnSalir').classList.remove('oculto');
+    mostrar('centros');
+  }).catch(() => { token = null; });
+}
+
+function cerrarSesion(){
+  token = null;
+  $('app').classList.add('oculto'); $('btnSalir').classList.add('oculto');
+  $('pantallaLogin').classList.remove('oculto'); $('quien').textContent = '';
+}
+
+window.onload = () => {
+  const esperar = setInterval(() => {
+    if(window.google && google.accounts){
+      clearInterval(esperar);
+      google.accounts.id.initialize({ client_id: CLIENT_ID, callback: alIniciar });
+      google.accounts.id.renderButton($('botonGoogle'), { theme:'outline', size:'large', text:'signin_with', locale:'es' });
+    }
+  }, 200);
+};
+$('btnSalir').onclick = cerrarSesion;
+
+const vistas = { centros:'vCentros', detalle:'vDetalle', nuevoCentro:'vNuevoCentro', nuevoBecario:'vNuevoBecario' };
+function mostrar(v){
+  Object.values(vistas).forEach(id => $(id).classList.add('oculto'));
+  $(vistas[v]).classList.remove('oculto');
+  if(v === 'centros') cargarCentros();
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => mostrar(b.dataset.vista));
+$('btnVolver').onclick = () => mostrar('centros');
+
+function esc(t){ const d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
+
+async function cargarCentros(){
+  const lista = $('listaCentros'); lista.textContent = 'Cargando…';
+  const centros = await api('listarCentros');
+  if(!centros.length){ lista.textContent = 'Todavía no hay centros. Crea el primero en «Nuevo centro».'; return; }
+  lista.innerHTML = centros.map(c => `<div class="centro"><div><strong>${esc(c.nombre)}</strong><div class="cupo">${esc(c.id)} · ${esc(c.estatus)} · ${c.becarios_vigentes}/5 becarios</div></div><button class="sec" data-id="${esc(c.id)}">Abrir</button></div>`).join('');
+  lista.querySelectorAll('button').forEach(b => b.onclick = () => abrirCentro(b.dataset.id));
+}
+
+let centroActual = null;
+async function abrirCentro(id){
+  const d = await api('verCentro', { centro_id: id });
+  centroActual = id;
+  mostrar('detalle');
+  $('detNombre').textContent = d.centro.nombre;
+  $('detEstado').textContent = d.centro.id + ' · ' + d.centro.estatus;
+  $('detBecarios').innerHTML = d.becarios.length
+    ? d.becarios.map(b => `<div class="centro"><span>${esc(b.nombre)} <span class="cupo">(${esc(b.becario_id)})</span></span></div>`).join('')
+    : '<p class="cupo">Sin becarios asignados.</p>';
+  $('detKardex').innerHTML = d.kardex.length
+    ? d.kardex.map(k => `<div class="centro"><span>${esc(String(k.fecha_hora).replace('T',' '))} — ${esc(k.tipo_evento)}: ${esc(k.observacion)}</span></div>`).join('')
+    : '<p class="cupo">Sin movimientos.</p>';
+}
+
+$('btnAsignar').onclick = async () => {
+  await api('asignarBecario', { becario_id: $('asBecario').value.trim().toUpperCase(), centro_id: centroActual, motivo: $('asMotivo').value });
+  aviso('Becario asignado.', 'ok'); $('asBecario').value = ''; $('asMotivo').value = ''; abrirCentro(centroActual);
+};
+
+$('btnGuardarCentro').onclick = async () => {
+  const r = await api('crearCentro', { nombre: $('cNombre').value, tipo: $('cTipo').value,
+    responsable_nombre: $('cRespNombre').value, responsable_curp: $('cCurp').value, observaciones: $('cObs').value });
+  aviso('Centro guardado: ' + r.id + (r.advertencias.length ? '. Aviso: ' + r.advertencias.join(' ') : ''), 'ok');
+  ['cNombre','cTipo','cRespNombre','cCurp','cObs'].forEach(i => $(i).value = ''); mostrar('centros');
+};
+
+$('btnGuardarBecario').onclick = async () => {
+  const r = await api('crearBecario', { nombre: $('bNombre').value, primer_apellido: $('bAp1').value,
+    segundo_apellido: $('bAp2').value, curp: $('bCurp').value, correo: $('bCorreo').value,
+    celular: $('bCel').value, celular_familiar: $('bCelF').value });
+  aviso('Becario guardado: ' + r.id + (r.advertencias.length ? '. Aviso: ' + r.advertencias.join(' ') : ''), 'ok');
+  ['bNombre','bAp1','bAp2','bCurp','bCorreo','bCel','bCelF'].forEach(i => $(i).value = ''); mostrar('centros');
+};
+</script>
+</body>
+</html>
