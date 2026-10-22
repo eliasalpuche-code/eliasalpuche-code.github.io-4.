@@ -8,6 +8,7 @@
 <link rel="icon" href="icon-192.png">
 <title>Centros y Becarios</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" async></script>
 <style>
 :root{--azul:#0d4a8a;--btn:#1766b5;--fondo:#eef2f7;--papel:#fff;--tinta:#14202e;--suave:#5a6878;--linea:#d3dbe6;--aviso:#b3261e;color-scheme:light dark}
 @media (prefers-color-scheme:dark){:root{--azul:#0a3560;--btn:#2f7fd0;--fondo:#0e141b;--papel:#17212c;--tinta:#e6edf5;--suave:#9fb0c2;--linea:#2a3744;--aviso:#ff8a80}}
@@ -47,8 +48,8 @@ input[type=checkbox]{width:auto;margin-right:6px}
 .sub{display:block;margin-top:14px;font-weight:700}
 #mensaje{position:fixed;left:10px;right:10px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:20;padding:12px;border-radius:10px;color:#fff;font-weight:600;display:none}
 #mensaje.ok{display:block;background:#1b7a4b}#mensaje.error{display:block;background:#b3261e}
-#modalLogin{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px}
-#modalLogin .tarjeta{max-width:420px;width:100%}
+#modalLogin,#modalQR{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px}
+#modalLogin .tarjeta,#modalQR .tarjeta{max-width:420px;width:100%}
 </style>
 </head>
 <body>
@@ -100,6 +101,13 @@ input[type=checkbox]{width:auto;margin-right:6px}
   <div class="tarjeta"><button class="sec" id="btnBorrar">Borrar datos locales</button><p class="suave">Solo se puede cuando no hay pendientes. Borra la lista descargada de centros y becarios de este teléfono.</p></div>
 </section>
 </main>
+
+<div id="modalQR" class="oculto"><div class="tarjeta"><h2>Leer CURP con QR</h2>
+  <video id="qrVideo" playsinline muted style="width:100%;border-radius:10px;background:#000;max-height:50vh"></video>
+  <div id="qrMsg" class="suave" style="margin-top:8px"></div>
+  <p class="suave">La lectura del QR solo ayuda a capturar; no verifica oficialmente la identidad.</p>
+  <div class="fila"><button class="sec" id="qrElegir">Elegir foto</button><button class="sec" id="qrCerrar">Cancelar</button></div>
+  <input type="file" id="qrArchivo" accept="image/*" class="oculto"></div></div>
 
 <div id="modalLogin" class="oculto"><div class="tarjeta"><h2>Iniciar sesión</h2><p>Para sincronizar se necesita tu cuenta de Google autorizada.</p><div id="botonGoogle"></div><div class="fila"><button class="sec" id="cerrarLogin">Cancelar</button></div></div></div>
 
@@ -155,7 +163,7 @@ addEventListener('online', red); addEventListener('offline', red);
 
 /* ---------- Campos de persona (se reutilizan en altas y edición) ---------- */
 const persona = p => `
-<label>CURP</label><input id="${p}Curp" maxlength="18" autocapitalize="characters" autocomplete="off"><div class="hint" id="${p}Hint"></div>
+<button type="button" class="sec" data-qr="${p}" style="width:100%;margin-top:4px">📷 Leer CURP con QR</button><label>CURP</label><input id="${p}Curp" maxlength="18" autocapitalize="characters" autocomplete="off"><div class="hint" id="${p}Hint"></div>
 <div class="dos"><div><label>Apellido paterno</label><input id="${p}Ap1"></div><div><label>Apellido materno</label><input id="${p}Ap2"></div></div>
 <label>Nombre(s)${p === 'bc' ? ' *' : ''}</label><input id="${p}Nom">
 <div class="dos"><div><label>Género</label><select id="${p}Sexo"><option value=""></option><option value="M">Mujer</option><option value="H">Hombre</option></select></div>
@@ -179,6 +187,92 @@ function llenarPersona(p, d){
   $(p + 'Nom').value = d.nombre || ''; $(p + 'Sexo').value = d.sexo || ''; $(p + 'Fecha').value = d.fecha_nacimiento || ''; $(p + 'Estado').value = d.estado_nacimiento || '';
 }
 
+/* ---------- Lector de QR de la CURP ---------- */
+const ORIGEN = { tu: 'manual', bc: 'manual', ed: 'manual' };
+/*QR-INI*/
+const quitarAcentos = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+function estadoDesdeQR(nombre){
+  const n = quitarAcentos(nombre); if (!n) return '';
+  const exacto = ESTADOS.find(e => quitarAcentos(e) === n); if (exacto) return exacto;
+  const parc = ESTADOS.filter(e => n.startsWith(quitarAcentos(e)));
+  return parc.length === 1 ? parc[0] : '';
+}
+// Formato del QR: CURP|CURP anterior|apellido 1|apellido 2|nombre(s)|sexo|dd/mm/aaaa|estado|clave|
+function interpretarQR(texto){
+  const c = String(texto || '').split('|').map(x => x.trim());
+  if (c.length < 8) return { error: 'Este QR no parece ser de una CURP (formato no reconocido). Captura los datos manualmente.' };
+  const curp = c[0].toUpperCase();
+  if (!REGEX_CURP.test(curp)) return { error: 'La CURP del QR no tiene un formato válido. Captura los datos manualmente.' };
+  if (c[1].replace(/[\s,;]/g, '')) return { correccion: true };   // trae dos CURP: hubo una corrección
+  const f = /^(\d\d)\/(\d\d)\/(\d{4})$/.exec(c[6]);
+  const fecha = f ? `${f[3]}-${f[2]}-${f[1]}` : '';
+  const avisos = [];
+  if (fecha && fecha.slice(2, 4) + fecha.slice(5, 7) + fecha.slice(8, 10) !== curp.slice(4, 10)) avisos.push('La fecha de nacimiento no coincide con la CURP; revísala.');
+  const sx = quitarAcentos(c[5]), estado = estadoDesdeQR(c[7]);
+  if (!estado && c[7]) avisos.push('No se pudo identificar el estado de nacimiento; elígelo manualmente.');
+  return { datos: { curp, primer_apellido: c[2], segundo_apellido: c[3], nombre: c[4],
+    sexo: sx === 'MUJER' ? 'M' : sx === 'HOMBRE' ? 'H' : '', fecha_nacimiento: fecha, estado_nacimiento: estado }, avisos };
+}
+/*QR-FIN*/
+function aplicarQR(p, texto){
+  const r = interpretarQR(texto);
+  if (r.error){ aviso(r.error, 'error'); return; }
+  if (r.correccion){
+    aviso('Este QR trae una CORRECCIÓN de CURP (dos CURP). Captura los datos manualmente.', 'error');
+    $(p + 'Hint').textContent = 'QR con corrección de CURP: captura manual.'; return;
+  }
+  llenarPersona(p, r.datos); ORIGEN[p] = 'qr'; $(p + 'Hint').textContent = '';
+  aviso('Datos leídos del QR. Revísalos antes de guardar.' + (r.avisos.length ? ' ' + r.avisos.join(' ') : ''), r.avisos.length ? 'error' : 'ok');
+}
+let qrP = null, qrStream = null, qrActivo = false;
+const qrCanvas = document.createElement('canvas');
+function decodificarQR(fuente, w, h){
+  qrCanvas.width = w; qrCanvas.height = h;
+  const ctx = qrCanvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(fuente, 0, 0, w, h);
+  const r = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'attemptBoth' });
+  return r ? r.data : null;
+}
+function cerrarQR(){
+  qrActivo = false;
+  if (qrStream){ qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+  $('qrVideo').srcObject = null; $('modalQR').classList.add('oculto');
+}
+async function abrirQR(p){
+  qrP = p; $('modalQR').classList.remove('oculto');
+  if (!window.jsQR){ $('qrMsg').textContent = 'El lector de QR aún no está disponible. Conéctate a internet una vez y vuelve a intentarlo.'; return; }
+  $('qrMsg').textContent = 'Apunta la cámara al QR del documento CURP.';
+  try {
+    qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    $('qrVideo').srcObject = qrStream; await $('qrVideo').play(); qrActivo = true; escanear();
+  } catch (e) { $('qrMsg').textContent = 'No se pudo abrir la cámara (permiso o dispositivo). Puedes elegir una foto.'; }
+}
+function escanear(){
+  if (!qrActivo) return;
+  const v = $('qrVideo');
+  if (v.videoWidth){
+    const k = Math.min(1, 800 / v.videoWidth), t = decodificarQR(v, Math.round(v.videoWidth * k), Math.round(v.videoHeight * k));
+    if (t){ cerrarQR(); aplicarQR(qrP, t); return; }
+  }
+  setTimeout(escanear, 200);
+}
+$('qrElegir').onclick = () => $('qrArchivo').click();
+$('qrArchivo').onchange = e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  if (!window.jsQR){ $('qrMsg').textContent = 'El lector de QR aún no está disponible. Conéctate a internet una vez y vuelve a intentarlo.'; return; }
+  const img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const t = decodificarQR(img, Math.round(img.width * k), Math.round(img.height * k));
+    URL.revokeObjectURL(img.src);
+    if (t){ cerrarQR(); aplicarQR(qrP, t); }
+    else $('qrMsg').textContent = 'No se encontró un QR legible en la foto. Acércala o mejora la luz e inténtalo de nuevo, o captura manualmente.';
+  };
+  img.src = URL.createObjectURL(f);
+};
+$('qrCerrar').onclick = cerrarQR;
+document.addEventListener('click', e => { const b = e.target.closest('[data-qr]'); if (b) abrirQR(b.dataset.qr); });
+
 /* ---------- Altas por pasos ---------- */
 const PASOS = { ct: ['Datos CT', 'Tutor', 'Guardar'], bc: ['Datos', 'Centro', 'Guardar'] };
 const paso = { ct: 1, bc: 1 };
@@ -200,7 +294,7 @@ function validar(f, n){
 });
 async function reiniciar(f){
   document.querySelectorAll(`#p-${f} input,#p-${f} select,#p-${f} textarea`).forEach(e => e.type === 'checkbox' ? e.checked = false : e.value = '');
-  paso[f] = 1; if (f === 'bc') await llenarCentros(); pintarPaso(f);
+  paso[f] = 1; ORIGEN.tu = ORIGEN.bc = 'manual'; if (f === 'bc') await llenarCentros(); pintarPaso(f);
 }
 function resumen(f){
   const filas = f === 'ct'
@@ -213,13 +307,13 @@ $('gua-ct').onclick = async () => {
   await encolar({ uid: nuevoUid(), tipo: 'crearCentro', etiqueta: 'Centro: ' + nombre, datos: {
     nombre, tipo: val('ctGiro'), responsable_curp: p.curp, responsable_nombre: p.nombre, responsable_primer_apellido: p.primer_apellido,
     responsable_segundo_apellido: p.segundo_apellido, responsable_sexo: p.sexo, responsable_fecha_nacimiento: p.fecha_nacimiento,
-    responsable_estado_nacimiento: p.estado_nacimiento, borrador: $('ctBorrador').checked, origen_captura: 'manual', capturado_en: localISO() } });
+    responsable_estado_nacimiento: p.estado_nacimiento, borrador: $('ctBorrador').checked, origen_captura: ORIGEN.tu, capturado_en: localISO() } });
   aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); ir('inicio');
 };
 $('gua-bc').onclick = async () => {
   const uid = nuevoUid(), nombre = nombreCompleto('bc'), ahora = localISO();
   await encolar({ uid, tipo: 'crearBecario', etiqueta: 'Becario: ' + nombre, datos: { ...datosPersona('bc'),
-    correo: val('bcCorreo'), celular: val('bcCel'), celular_familiar: val('bcCelF'), borrador: $('bcBorrador').checked, origen_captura: 'manual', capturado_en: ahora } });
+    correo: val('bcCorreo'), celular: val('bcCel'), celular_familiar: val('bcCelF'), borrador: $('bcBorrador').checked, origen_captura: ORIGEN.bc, capturado_en: ahora } });
   const c = $('bcCentro').value;
   if (c) await encolar({ uid: nuevoUid(), tipo: 'asignar', etiqueta: 'Asignación de ' + nombre, datos: { becario_ref: uid, centro_ref: c, desde: '', fecha: ahora.slice(0, 10) } });
   aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); ir('inicio');
