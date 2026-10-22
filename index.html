@@ -8,7 +8,7 @@
 <link rel="icon" href="icon-192.png">
 <title>Centros y Becarios</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" async></script>
 <style>
 :root{--azul:#0d4a8a;--btn:#1766b5;--fondo:#eef2f7;--papel:#fff;--tinta:#14202e;--suave:#5a6878;--linea:#d3dbe6;--aviso:#b3261e;color-scheme:light dark}
 @media (prefers-color-scheme:dark){:root{--azul:#0a3560;--btn:#2f7fd0;--fondo:#0e141b;--papel:#17212c;--tinta:#e6edf5;--suave:#9fb0c2;--linea:#2a3744;--aviso:#ff8a80}}
@@ -113,8 +113,8 @@ input[type=checkbox]{width:auto;margin-right:6px}
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbzbEgp3KL3ApJyoc0CqVftdTTD28T9iDJIFDB-JhgVtlriTEosd1iz-UUY7Vv3t9ruY/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
 
 const $ = id => document.getElementById(id);
@@ -226,7 +226,12 @@ function aplicarQR(p, texto){
 }
 let qrP = null, qrStream = null, qrActivo = false;
 const qrCanvas = document.createElement('canvas');
-function decodificarQR(fuente, w, h){
+// Primero el lector nativo de Chrome en Android (no necesita descargar nada); si no existe, la librería jsQR.
+let detectorNativo = null;
+try { if ('BarcodeDetector' in window) detectorNativo = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) {}
+async function decodificarQR(fuente, w, h){
+  if (detectorNativo){ try { const d = await detectorNativo.detect(fuente); if (d.length) return d[0].rawValue; } catch (e) {} }
+  if (!window.jsQR) return null;
   qrCanvas.width = w; qrCanvas.height = h;
   const ctx = qrCanvas.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(fuente, 0, 0, w, h);
@@ -240,18 +245,18 @@ function cerrarQR(){
 }
 async function abrirQR(p){
   qrP = p; $('modalQR').classList.remove('oculto');
-  if (!window.jsQR){ $('qrMsg').textContent = 'El lector de QR aún no está disponible. Conéctate a internet una vez y vuelve a intentarlo.'; return; }
+  if (!detectorNativo && !window.jsQR){ $('qrMsg').textContent = 'El lector de QR aún no está disponible. Conéctate a internet una vez y vuelve a intentarlo.'; return; }
   $('qrMsg').textContent = 'Apunta la cámara al QR del documento CURP.';
   try {
     qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
     $('qrVideo').srcObject = qrStream; await $('qrVideo').play(); qrActivo = true; escanear();
   } catch (e) { $('qrMsg').textContent = 'No se pudo abrir la cámara (permiso o dispositivo). Puedes elegir una foto.'; }
 }
-function escanear(){
+async function escanear(){
   if (!qrActivo) return;
   const v = $('qrVideo');
   if (v.videoWidth){
-    const k = Math.min(1, 800 / v.videoWidth), t = decodificarQR(v, Math.round(v.videoWidth * k), Math.round(v.videoHeight * k));
+    const k = Math.min(1, 800 / v.videoWidth), t = await decodificarQR(v, Math.round(v.videoWidth * k), Math.round(v.videoHeight * k));
     if (t){ cerrarQR(); aplicarQR(qrP, t); return; }
   }
   setTimeout(escanear, 200);
@@ -259,11 +264,11 @@ function escanear(){
 $('qrElegir').onclick = () => $('qrArchivo').click();
 $('qrArchivo').onchange = e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  if (!window.jsQR){ $('qrMsg').textContent = 'El lector de QR aún no está disponible. Conéctate a internet una vez y vuelve a intentarlo.'; return; }
+  if (!detectorNativo && !window.jsQR){ $('qrMsg').textContent = 'El lector de QR aún no está disponible. Conéctate a internet una vez y vuelve a intentarlo.'; return; }
   const img = new Image();
-  img.onload = () => {
+  img.onload = async () => {
     const k = Math.min(1, 1600 / Math.max(img.width, img.height));
-    const t = decodificarQR(img, Math.round(img.width * k), Math.round(img.height * k));
+    const t = await decodificarQR(img, Math.round(img.width * k), Math.round(img.height * k));
     URL.revokeObjectURL(img.src);
     if (t){ cerrarQR(); aplicarQR(qrP, t); }
     else $('qrMsg').textContent = 'No se encontró un QR legible en la foto. Acércala o mejora la luz e inténtalo de nuevo, o captura manualmente.';
