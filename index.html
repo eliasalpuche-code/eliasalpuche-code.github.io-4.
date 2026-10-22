@@ -85,6 +85,11 @@ input[type=checkbox]{width:auto;margin-right:6px}
 
 <section class="pantalla" id="p-detalle">
   <div class="tarjeta"><h2 id="detNombre"></h2><div id="detInfo" class="suave"></div><div id="detBec"></div></div>
+  <div class="tarjeta oculto" id="cambioBox"><b>Cambiar centro de trabajo</b><div id="cambioActual" class="suave"></div>
+    <label>Nuevo centro</label><select id="cbCentro"></select>
+    <label>Motivo *</label><input id="cbMotivo" placeholder="Por qué se cambia">
+    <label>Fecha del cambio</label><input id="cbFecha" type="date">
+    <div class="fila"><button id="btnCambiar">Cambiar centro</button></div></div>
   <div class="tarjeta"><b>Kardex</b><div id="detKardex"></div>
     <div id="detObsBox" class="oculto"><label>Nueva observación</label><textarea id="detObs" rows="2"></textarea><div class="fila"><button id="btnObs">Agregar observación</button></div></div></div>
 </section>
@@ -100,8 +105,8 @@ input[type=checkbox]{width:auto;margin-right:6px}
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbzbEgp3KL3ApJyoc0CqVftdTTD28T9iDJIFDB-JhgVtlriTEosd1iz-UUY7Vv3t9ruY/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
 
 const $ = id => document.getElementById(id);
@@ -242,7 +247,8 @@ $('busCT').oninput = () => listar('ct'); $('busBC').oninput = () => listar('bc')
 
 async function detalle(t, id, ti){
   det = { t, id }; ir('detalle');
-  $('detNombre').textContent = ti; $('detInfo').textContent = id; $('detBec').innerHTML = ''; $('detKardex').innerHTML = ''; $('detObsBox').classList.add('oculto');
+  $('detNombre').textContent = ti; $('detInfo').textContent = id; $('detBec').innerHTML = ''; $('detKardex').innerHTML = ''; $('detObsBox').classList.add('oculto'); $('cambioBox').classList.add('oculto');
+  if (t === 'bc') prepararCambio(id);
   if (!token){ $('detKardex').innerHTML = '<p class="suave">Para ver el kardex, sincroniza primero (requiere internet e inicio de sesión).</p>'; return; }
   try {
     const d = await api(t === 'ct' ? 'verCentro' : 'verBecario', t === 'ct' ? { centro_id: id } : { becario_id: id });
@@ -254,6 +260,30 @@ async function detalle(t, id, ti){
     $('detObsBox').classList.remove('oculto');
   } catch (e) { aviso(e.message, 'error'); }
 }
+async function prepararCambio(id){
+  const b = ((await meta('becarios')) || []).find(x => x.id === id);
+  const m = b && /\((CT-\d+)\)$/.exec(b.centro_actual || '');
+  const actualId = m ? m[1] : '';
+  const pend = (await dbAll('cola')).some(o => o.tipo === 'asignar' && o.datos.becario_ref === id);
+  $('cambioActual').textContent = 'Centro actual: ' + ((b && b.centro_actual) || 'sin centro asignado') + (pend ? ' · Ya hay un cambio pendiente de sincronizar.' : '');
+  const cs = await centrosDisponibles();
+  $('cbCentro').innerHTML = '<option value="">Elige un centro…</option>' + cs.map(c => {
+    const off = c.id === actualId || c.libres <= 0 || c.estatus !== 'activo';
+    const nota = c.id === actualId ? 'centro actual' : (c.estatus !== 'activo' ? c.estatus : c.libres + ' lugares libres');
+    return `<option value="${esc(c.id)}" ${off ? 'disabled' : ''}>${esc(c.nombre)} · ${nota}${c.pendiente ? ' · pendiente' : ''}</option>`;
+  }).join('');
+  const h = new Date(); h.setMinutes(h.getMinutes() - h.getTimezoneOffset());
+  $('cbFecha').value = h.toISOString().slice(0, 10); $('cbMotivo').value = '';
+  $('cambioBox').classList.remove('oculto');
+}
+$('btnCambiar').onclick = async () => {
+  const c = $('cbCentro').value, m = val('cbMotivo');
+  if (!c){ aviso('Elige el nuevo centro.', 'error'); return; }
+  if (!m){ aviso('El motivo es obligatorio.', 'error'); return; }
+  await encolar({ uid: nuevoUid(), tipo: 'asignar', etiqueta: 'Cambio de centro de ' + $('detNombre').textContent,
+    datos: { becario_ref: det.id, centro_ref: c, motivo: m, fecha: $('cbFecha').value } });
+  aviso('Cambio guardado. Pendiente de sincronizar.', 'ok'); ir('inicio');
+};
 function fechaBonita(t){
   const m = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/.exec(t || '');
   return m ? new Date(m[1], m[2] - 1, m[3], m[4], m[5]).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : (t || '');
