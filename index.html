@@ -70,15 +70,17 @@ input[type=checkbox]{width:auto;margin-right:6px}
   <div class="pasos" id="ind-ct"></div>
   <div class="paso" data-n="1"><label>Nombre del CT *</label><input id="ctNombre"><label>Giro</label><input id="ctGiro"></div>
   <div class="paso" data-n="2"><div id="tuCampos"></div></div>
-  <div class="paso" data-n="3"><div id="res-ct"></div><label><input type="checkbox" id="ctBorrador">Guardar como borrador (faltan datos)</label></div>
+  <div class="paso" data-n="3"><div id="ctDirCampos"></div></div>
+  <div class="paso" data-n="4"><div id="res-ct"></div><label><input type="checkbox" id="ctBorrador">Guardar como borrador (faltan datos)</label></div>
   <div class="fila"><button class="sec" id="ant-ct">Anterior</button><button id="sig-ct">Siguiente</button><button id="gua-ct">Guardar</button></div>
 </div></section>
 
 <section class="pantalla" id="p-bc"><div class="tarjeta">
   <div class="pasos" id="ind-bc"></div>
   <div class="paso" data-n="1"><div id="bcCampos"></div></div>
-  <div class="paso" data-n="2"><label>Centro de trabajo</label><select id="bcCentro"></select></div>
-  <div class="paso" data-n="3"><div id="res-bc"></div><label><input type="checkbox" id="bcBorrador">Guardar como borrador (faltan datos)</label></div>
+  <div class="paso" data-n="2"><div id="bcDirCampos"></div></div>
+  <div class="paso" data-n="3"><label>Centro de trabajo</label><select id="bcCentro"></select></div>
+  <div class="paso" data-n="4"><div id="res-bc"></div><label><input type="checkbox" id="bcBorrador">Guardar como borrador (faltan datos)</label></div>
   <div class="fila"><button class="sec" id="ant-bc">Anterior</button><button id="sig-bc">Siguiente</button><button id="gua-bc">Guardar</button></div>
 </div></section>
 
@@ -129,8 +131,8 @@ function fechaDMA(t){ const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(t || ''); return m
 
 /* ---------- Base local (IndexedDB) ---------- */
 const dbp = new Promise((ok, no) => {
-  const r = indexedDB.open('cb', 1);
-  r.onupgradeneeded = () => { r.result.createObjectStore('cola', { keyPath: 'uid' }); r.result.createObjectStore('meta', { keyPath: 'k' }); };
+  const r = indexedDB.open('cb', 2);
+  r.onupgradeneeded = () => { const d = r.result; [['cola', 'uid'], ['meta', 'k'], ['cp', 'cp']].forEach(([n, k]) => { if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: k }); }); };
   r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
 });
 const tx = async (s, modo, f) => { const db = await dbp; return new Promise((ok, no) => { const t = db.transaction(s, modo), q = f(t.objectStore(s)); t.oncomplete = () => ok(q && q.result); t.onerror = () => no(t.error); }); };
@@ -278,18 +280,128 @@ $('qrArchivo').onchange = e => {
 $('qrCerrar').onclick = cerrarQR;
 document.addEventListener('click', e => { const b = e.target.closest('[data-qr]'); if (b) abrirQR(b.dataset.qr); });
 
+/* ---------- Domicilio y ubicación ---------- */
+const CAMPOS_DOM = [['Calle', 'calle'], ['NumExt', 'num_ext'], ['NumInt', 'num_int'], ['Ref', 'referencias'], ['CP', 'cp'], ['Colonia', 'colonia'], ['Municipio', 'municipio'], ['EstadoDom', 'estado'], ['Tipo', 'tipo']];
+const TIPOS_BASE = ['Colonia', 'Fraccionamiento', 'Ejido', 'Barrio', 'Equipamiento', 'Conjunto habitacional', 'Unidad habitacional', 'Condominio', 'Zona industrial', 'Zona federal', 'Ranchería', 'Pueblo', 'Rancho', 'Aeropuerto', 'Paraje', 'Granja', 'Finca', 'Hacienda', 'Puerto'];
+let TIPOS = TIPOS_BASE.slice();
+const opcionesTipos = () => '<option value=""></option>' + TIPOS.map(t => `<option>${esc(t)}</option>`).join('');
+function asegurarOpcion(sel, v){ if (v && ![...sel.options].some(o => o.value === v)) sel.add(new Option(v, v)); }
+function refrescarTipos(){ document.querySelectorAll('select[id$="Tipo"]').forEach(s => { const v = s.value; s.innerHTML = opcionesTipos(); asegurarOpcion(s, v); s.value = v; }); }
+(async () => { const t = await meta('tipos'); if (t && t.length){ TIPOS = t; refrescarTipos(); } })();
+const direccion = p => `<span class="sub">Domicilio</span>
+<label>Calle</label><input id="${p}Calle">
+<div class="dos"><div><label>Número exterior</label><input id="${p}NumExt"></div><div><label>Número interior</label><input id="${p}NumInt"></div></div>
+<label>Entre calles o referencias</label><input id="${p}Ref">
+<div class="dos"><div><label>Código postal</label><input id="${p}CP" inputmode="numeric" maxlength="5" oninput="buscarCP('${p}')"></div><div><label>Tipo de asentamiento</label><select id="${p}Tipo">${opcionesTipos()}</select></div></div>
+<div class="suave" id="${p}CPMsg"></div>
+<label>Colonia o asentamiento</label><select id="${p}ColSel" class="oculto" onchange="elegirColonia('${p}')"></select>
+<input id="${p}Colonia" placeholder="Escribe la colonia o asentamiento">
+<div class="dos"><div><label>Municipio o alcaldía</label><input id="${p}Municipio"></div><div><label>Estado</label><select id="${p}EstadoDom"><option value=""></option>${ESTADOS.filter(e => e !== 'Nacido en el extranjero').map(e => `<option>${e}</option>`).join('')}</select></div></div>`;
+const ubicacion = p => `<span class="sub">Ubicación del centro de trabajo</span>
+<div class="fila"><button type="button" data-gps="${p}">📍 Capturar ubicación</button></div>
+<div class="hint" id="${p}UbiMsg"></div>
+<div class="dos"><div><label>Latitud</label><input id="${p}Lat" inputmode="decimal" oninput="PREC['${p}']='';pintarPrec('${p}')"></div><div><label>Longitud</label><input id="${p}Lng" inputmode="decimal" oninput="PREC['${p}']='';pintarPrec('${p}')"></div></div>
+<div id="${p}UbiPrec" class="suave"></div>
+<div class="fila"><button type="button" class="sec" data-copiar="${p}:lat">Copiar latitud</button><button type="button" class="sec" data-copiar="${p}:lng">Copiar longitud</button></div>
+<div class="fila"><button type="button" class="sec" data-copiar="${p}:ambas">Copiar ambas</button><button type="button" class="sec" data-mapa="${p}">Abrir Google Maps</button></div>`;
+$('ctDirCampos').innerHTML = direccion('ct') + ubicacion('ct');
+$('bcDirCampos').innerHTML = direccion('bc');
+const PREC = {};
+const num = t => String(t).replace(',', '.');
+const coordsOk = (a, b) => { const x = Number(a), y = Number(b); return a !== '' && b !== '' && isFinite(x) && isFinite(y) && Math.abs(x) <= 90 && Math.abs(y) <= 180; };
+const datosDom = p => Object.fromEntries(CAMPOS_DOM.map(([id, k]) => ['dom_' + k, val(p + id)]));
+const llenarDom = (p, r) => CAMPOS_DOM.forEach(([id, k]) => { const v = r['dom_' + k] || ''; if (id === 'Tipo') asegurarOpcion($(p + id), v); $(p + id).value = v; });
+const datosUbi = p => { const lat = num(val(p + 'Lat')), lng = num(val(p + 'Lng')); return { latitud: lat, longitud: lng, precision_m: PREC[p] || '', ubicacion_en: lat ? localISO() : '' }; };
+function llenarUbi(p, r){ $(p + 'Lat').value = r.latitud || ''; $(p + 'Lng').value = r.longitud || ''; PREC[p] = r.precision_m || ''; pintarPrec(p); $(p + 'UbiMsg').textContent = ''; }
+function pintarPrec(p){ $(p + 'UbiPrec').textContent = PREC[p] ? 'Precisión reportada: ±' + PREC[p] + ' m' : ''; }
+const domTexto = d => [d.dom_calle, d.dom_num_ext && 'No. ' + d.dom_num_ext, d.dom_num_int && 'Int. ' + d.dom_num_int, [d.dom_tipo, d.dom_colonia].filter(Boolean).join(' '), d.dom_cp && 'C.P. ' + d.dom_cp, d.dom_municipio, d.dom_estado].filter(Boolean).join(', ');
+const filasDom = r => fila('Calle', r.dom_calle) + fila('Número exterior', r.dom_num_ext) + fila('Número interior', r.dom_num_int) + fila('Referencias', r.dom_referencias) +
+  fila('Código postal', r.dom_cp) + fila('Tipo de asentamiento', r.dom_tipo) + fila('Colonia', r.dom_colonia) + fila('Municipio o alcaldía', r.dom_municipio) + fila('Estado', r.dom_estado);
+const filasUbi = r => r.latitud ? fila('Latitud', r.latitud) + fila('Longitud', r.longitud) + fila('Precisión', r.precision_m ? '±' + r.precision_m + ' m' : '') + fila('Capturada', fechaDMA(r.ubicacion_capturada_en)) +
+  `<div class="fila"><button class="sec" data-fc="ambas" data-lat="${esc(r.latitud)}" data-lng="${esc(r.longitud)}">Copiar coordenadas</button><button class="sec" data-fm data-lat="${esc(r.latitud)}" data-lng="${esc(r.longitud)}">Abrir Google Maps</button></div>`
+  : '<p class="suave">Sin ubicación capturada.</p>';
+/* Catálogo postal: al escribir el C.P. se listan los asentamientos y se autollenan tipo, municipio y estado. */
+const CPDATA = {};
+async function guardarCatalogo(cat){
+  const por = {};
+  cat.filas.forEach(f => (por[f[0]] = por[f[0]] || []).push([f[1], f[2], f[3], f[4]]));
+  const db = await dbp;
+  await new Promise((ok, no) => {
+    const t = db.transaction('cp', 'readwrite'), st = t.objectStore('cp'); st.clear();
+    Object.keys(por).forEach(cp => { por[cp].sort((a, b) => a[1].localeCompare(b[1], 'es')); st.put({ cp, items: por[cp] }); });
+    t.oncomplete = ok; t.onerror = () => no(t.error);
+  });
+  await setMeta('tipos', cat.tipos); await setMeta('cat_version', cat.version);
+  if (cat.tipos.length){ TIPOS = cat.tipos; refrescarTipos(); }
+}
+function resetCP(p){ $(p + 'ColSel').classList.add('oculto'); $(p + 'ColSel').innerHTML = ''; $(p + 'Colonia').classList.remove('oculto'); $(p + 'CPMsg').textContent = ''; }
+async function buscarCP(p){
+  const cp = val(p + 'CP'), msg = $(p + 'CPMsg'), sel = $(p + 'ColSel'), inp = $(p + 'Colonia');
+  const manual = m => { sel.classList.add('oculto'); sel.innerHTML = ''; inp.classList.remove('oculto'); msg.textContent = m; };
+  if (!/^\d{5}$/.test(cp)){ manual(''); return; }
+  const reg = await tx('cp', 'readonly', st => st.get(cp));
+  if (!reg){ manual((await meta('cat_version')) ? 'Código postal no encontrado en el catálogo. Captura los datos manualmente.' : 'El catálogo postal aún no se descarga: sincroniza una vez con internet. Captura manual por ahora.'); return; }
+  CPDATA[p] = reg.items;
+  sel.innerHTML = '<option value="">Elige la colonia…</option>' + reg.items.map((it, i) => `<option value="${i}">${esc(it[1])} (${esc(it[0])})</option>`).join('') + '<option value="otra">Otra (escribir manualmente)</option>';
+  sel.classList.remove('oculto'); inp.classList.add('oculto'); inp.value = '';
+  msg.textContent = reg.items.length + ' asentamiento(s) con este código postal. Elige uno de la lista.';
+  const muns = [...new Set(reg.items.map(i => i[2]))], ests = [...new Set(reg.items.map(i => i[3]))];
+  if (muns.length === 1) $(p + 'Municipio').value = muns[0];
+  if (ests.length === 1) $(p + 'EstadoDom').value = estadoDesdeQR(ests[0]);
+}
+function elegirColonia(p){
+  const sel = $(p + 'ColSel'), inp = $(p + 'Colonia'), v = sel.value;
+  if (v === 'otra'){ inp.classList.remove('oculto'); inp.value = ''; inp.focus(); return; }
+  inp.classList.add('oculto');
+  if (v === ''){ inp.value = ''; return; }
+  const it = CPDATA[p][+v];
+  inp.value = it[1]; asegurarOpcion($(p + 'Tipo'), it[0]); $(p + 'Tipo').value = it[0];
+  $(p + 'Municipio').value = it[2]; $(p + 'EstadoDom').value = estadoDesdeQR(it[3]);
+}
+
+function capturarGPS(p){
+  const m = $(p + 'UbiMsg');
+  if (!navigator.geolocation){ m.textContent = 'Este dispositivo no permite obtener la ubicación. Puedes continuar sin GPS.'; return; }
+  m.textContent = 'Obteniendo ubicación…';
+  navigator.geolocation.getCurrentPosition(pos => {
+    $(p + 'Lat').value = pos.coords.latitude.toFixed(6); $(p + 'Lng').value = pos.coords.longitude.toFixed(6);
+    PREC[p] = Math.round(pos.coords.accuracy); pintarPrec(p); m.textContent = '';
+  }, err => {
+    m.textContent = err.code === 1 ? 'Permiso de ubicación denegado. Actívalo para este sitio o continúa sin GPS.' : 'No se pudo obtener la ubicación. Prueba al aire libre o continúa sin GPS.';
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+async function copiar(q, lat, lng){
+  if (!lat || !lng){ aviso('Todavía no hay coordenadas.', 'error'); return; }
+  const t = q === 'lat' ? lat : q === 'lng' ? lng : lat + ', ' + lng;
+  try { await navigator.clipboard.writeText(t); aviso('Copiado: ' + t, 'ok'); } catch (x) { aviso('No se pudo copiar.', 'error'); }
+}
+function abrirMapa(lat, lng){
+  if (!lat || !lng){ aviso('Todavía no hay coordenadas.', 'error'); return; }
+  window.open('https://www.google.com/maps?q=' + encodeURIComponent(lat + ',' + lng), '_blank', 'noopener');
+}
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-gps]'); if (g){ capturarGPS(g.dataset.gps); return; }
+  const c = e.target.closest('[data-copiar]');
+  if (c){ const [p, q] = c.dataset.copiar.split(':'); copiar(q, num(val(p + 'Lat')), num(val(p + 'Lng'))); return; }
+  const m = e.target.closest('[data-mapa]'); if (m){ abrirMapa(num(val(m.dataset.mapa + 'Lat')), num(val(m.dataset.mapa + 'Lng'))); return; }
+  const fc = e.target.closest('[data-fc]'); if (fc){ copiar(fc.dataset.fc, fc.dataset.lat, fc.dataset.lng); return; }
+  const fm = e.target.closest('[data-fm]'); if (fm) abrirMapa(fm.dataset.lat, fm.dataset.lng);
+});
+
 /* ---------- Altas por pasos ---------- */
-const PASOS = { ct: ['Datos CT', 'Tutor', 'Guardar'], bc: ['Datos', 'Centro', 'Guardar'] };
+const PASOS = { ct: ['Datos', 'Tutor', 'Dirección', 'Guardar'], bc: ['Datos', 'Dirección', 'Centro', 'Guardar'] };
 const paso = { ct: 1, bc: 1 };
 function pintarPaso(f){
   const n = paso[f];
   document.querySelectorAll(`#p-${f} .paso`).forEach(s => s.classList.toggle('activo', +s.dataset.n === n));
   $('ind-' + f).innerHTML = PASOS[f].map((t, i) => `<span class="pt ${i + 1 === n ? 'on' : ''} ${i + 1 < n ? 'hecho' : ''}"><b>${i + 1}</b>${t}</span>`).join('');
-  $('ant-' + f).classList.toggle('oculto', n === 1); $('sig-' + f).classList.toggle('oculto', n === 3); $('gua-' + f).classList.toggle('oculto', n !== 3);
-  if (n === 3) resumen(f);
+  $('ant-' + f).classList.toggle('oculto', n === 1); $('sig-' + f).classList.toggle('oculto', n === PASOS[f].length); $('gua-' + f).classList.toggle('oculto', n !== PASOS[f].length);
+  if (n === PASOS[f].length) resumen(f);
 }
 function validar(f, n){
   const id = f === 'ct' ? 'ctNombre' : 'bcNom';
+  if (((f === 'ct' && n === 3) || (f === 'bc' && n === 2)) && val(f + 'CP') && !/^\d{5}$/.test(val(f + 'CP'))){ aviso('El código postal debe tener 5 dígitos.', 'error'); return false; }
+  if (f === 'ct' && n === 3){ const u = datosUbi('ct'); if ((u.latitud || u.longitud) && !coordsOk(u.latitud, u.longitud)){ aviso('La latitud o la longitud no son válidas.', 'error'); return false; } }
   if (n === 1 && !$(id).value.trim()){ aviso('El nombre es obligatorio.', 'error'); $(id).focus(); return false; }
   return true;
 }
@@ -299,25 +411,25 @@ function validar(f, n){
 });
 async function reiniciar(f){
   document.querySelectorAll(`#p-${f} input,#p-${f} select,#p-${f} textarea`).forEach(e => e.type === 'checkbox' ? e.checked = false : e.value = '');
-  paso[f] = 1; ORIGEN.tu = ORIGEN.bc = 'manual'; if (f === 'bc') await llenarCentros(); pintarPaso(f);
+  paso[f] = 1; ORIGEN.tu = ORIGEN.bc = 'manual'; PREC.ct = ''; pintarPrec('ct'); $('ctUbiMsg').textContent = ''; resetCP('ct'); resetCP('bc'); if (f === 'bc') await llenarCentros(); pintarPaso(f);
 }
 function resumen(f){
   const filas = f === 'ct'
-    ? [['Centro', val('ctNombre')], ['Giro', val('ctGiro')], ['Tutor', nombreCompleto('tu')], ['CURP', val('tuCurp')]]
-    : [['Becario', nombreCompleto('bc')], ['CURP', val('bcCurp')], ['Centro', $('bcCentro').selectedOptions[0] ? $('bcCentro').selectedOptions[0].textContent : '']];
+    ? [['Centro', val('ctNombre')], ['Giro', val('ctGiro')], ['Tutor', nombreCompleto('tu')], ['CURP', val('tuCurp')], ['Domicilio', domTexto(datosDom('ct'))], ['Ubicación', val('ctLat') ? val('ctLat') + ', ' + val('ctLng') : 'Sin ubicación']]
+    : [['Becario', nombreCompleto('bc')], ['CURP', val('bcCurp')], ['Domicilio', domTexto(datosDom('bc'))], ['Centro', $('bcCentro').selectedOptions[0] ? $('bcCentro').selectedOptions[0].textContent : '']];
   $('res-' + f).innerHTML = filas.map(([a, b]) => `<div class="item"><span class="suave">${a}</span><span>${esc(b) || '—'}</span></div>`).join('');
 }
 $('gua-ct').onclick = async () => {
   const p = datosPersona('tu'), nombre = val('ctNombre');
   await encolar({ uid: nuevoUid(), tipo: 'crearCentro', etiqueta: 'Centro: ' + nombre, datos: {
-    nombre, tipo: val('ctGiro'), responsable_curp: p.curp, responsable_nombre: p.nombre, responsable_primer_apellido: p.primer_apellido,
+    nombre, tipo: val('ctGiro'), ...datosDom('ct'), ...datosUbi('ct'), responsable_curp: p.curp, responsable_nombre: p.nombre, responsable_primer_apellido: p.primer_apellido,
     responsable_segundo_apellido: p.segundo_apellido, responsable_sexo: p.sexo, responsable_fecha_nacimiento: p.fecha_nacimiento,
     responsable_estado_nacimiento: p.estado_nacimiento, borrador: $('ctBorrador').checked, origen_captura: ORIGEN.tu, capturado_en: localISO() } });
   aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); ir('inicio');
 };
 $('gua-bc').onclick = async () => {
   const uid = nuevoUid(), nombre = nombreCompleto('bc'), ahora = localISO();
-  await encolar({ uid, tipo: 'crearBecario', etiqueta: 'Becario: ' + nombre, datos: { ...datosPersona('bc'),
+  await encolar({ uid, tipo: 'crearBecario', etiqueta: 'Becario: ' + nombre, datos: { ...datosPersona('bc'), ...datosDom('bc'),
     correo: val('bcCorreo'), celular: val('bcCel'), celular_familiar: val('bcCelF'), borrador: $('bcBorrador').checked, origen_captura: ORIGEN.bc, capturado_en: ahora } });
   const c = $('bcCentro').value;
   if (c) await encolar({ uid: nuevoUid(), tipo: 'asignar', etiqueta: 'Asignación de ' + nombre, datos: { becario_ref: uid, centro_ref: c, desde: '', fecha: ahora.slice(0, 10) } });
@@ -370,12 +482,12 @@ async function ficha(t, id){
   det.r = r; $('detBec').innerHTML = '';
   if (t === 'ct'){
     $('detNombre').textContent = r.nombre; $('detInfo').textContent = r.id + ' · ' + r.estatus;
-    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + fila('Giro', r.tipo) + '<span class="sub">Tutor</span>' + filasPersona(r.tutor);
+    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + fila('Giro', r.tipo) + '<span class="sub">Tutor</span>' + filasPersona(r.tutor) + '<span class="sub">Domicilio</span>' + filasDom(r) + '<span class="sub">Ubicación</span>' + filasUbi(r);
     $('detBec').innerHTML = `<span class="sub">Becarios asignados (${r.becarios.length}/5)</span>` + (r.becarios.map(b => fila(b.nombre, b.id)).join('') || '<p class="suave">Ninguno.</p>');
   } else {
     $('detNombre').textContent = r.nombre; $('detInfo').textContent = r.id + ' · ' + r.estatus;
     const pend = (await dbAll('cola')).some(o => o.tipo === 'asignar' && o.datos.becario_ref === id);
-    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + filasPersona(r.persona) + fila('Correo', r.correo) + fila('Celular', r.celular) + fila('Celular del familiar', r.celular_familiar) +
+    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + filasPersona(r.persona) + fila('Correo', r.correo) + fila('Celular', r.celular) + fila('Celular del familiar', r.celular_familiar) + '<span class="sub">Domicilio</span>' + filasDom(r) +
       '<span class="sub">Centro de trabajo</span>' + fila('Centro actual', r.centro_nombre || 'Sin centro asignado') + fila('Asignado desde', fechaDMA(r.fecha_asignacion));
     $('cambioActual').textContent = (r.centro_nombre ? 'Centro actual: ' + r.centro_nombre : 'Sin centro asignado') + (pend ? ' · Hay un cambio pendiente de sincronizar.' : '');
     $('cbCentro').innerHTML = '<option value="">Elige un centro…</option>' + opcionesCentros(await centrosDisponibles(), r.centro_id);
@@ -393,27 +505,31 @@ $('btnCambiar').onclick = async () => {
 const ESTATUS_SEL = '<label>Estatus</label><select id="edEstatus"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="borrador">Borrador</option></select>';
 $('btnEditar').onclick = () => {
   const { t, r } = det;
-  $('edCampos').innerHTML = (t === 'ct' ? '<label>Nombre del CT *</label><input id="edNombre"><label>Giro</label><input id="edGiro">' + ESTATUS_SEL + '<span class="sub">Tutor</span>' + persona('ed')
-    : '<span class="sub">Datos del becario</span>' + persona('ed') + contactoBC('ed') + ESTATUS_SEL);
+  $('edCampos').innerHTML = (t === 'ct' ? '<label>Nombre del CT *</label><input id="edNombre"><label>Giro</label><input id="edGiro">' + ESTATUS_SEL + '<span class="sub">Tutor</span>' + persona('ed') + direccion('ed') + ubicacion('ed')
+    : '<span class="sub">Datos del becario</span>' + persona('ed') + contactoBC('ed') + direccion('ed') + ESTATUS_SEL);
   ligarCurp('ed');
-  if (t === 'ct'){ $('edNombre').value = r.nombre; $('edGiro').value = r.tipo; llenarPersona('ed', r.tutor); }
-  else { llenarPersona('ed', r.persona); $('edCorreo').value = r.correo; $('edCel').value = r.celular; $('edCelF').value = r.celular_familiar; }
+  if (t === 'ct'){ $('edNombre').value = r.nombre; $('edGiro').value = r.tipo; llenarPersona('ed', r.tutor); llenarDom('ed', r); llenarUbi('ed', r); }
+  else { llenarPersona('ed', r.persona); llenarDom('ed', r); $('edCorreo').value = r.correo; $('edCel').value = r.celular; $('edCelF').value = r.celular_familiar; }
   $('edEstatus').value = r.estatus; $('edBox').classList.remove('oculto'); $('edBox').scrollIntoView();
 };
 $('edCancelar').onclick = () => $('edBox').classList.add('oculto');
 async function guardarCache(clave, rec){ const arr = (await meta(clave)) || []; await setMeta(clave, arr.map(x => x.id === rec.id ? rec : x)); }
 $('edGuardar').onclick = async () => {
   const { t, r } = det, per = datosPersona('ed'), estatus = $('edEstatus').value;
+  if (val('edCP') && !/^\d{5}$/.test(val('edCP'))){ aviso('El código postal debe tener 5 dígitos.', 'error'); return; }
   if (t === 'ct'){
     if (!val('edNombre')){ aviso('El nombre del CT es obligatorio.', 'error'); return; }
-    const d = { id: r.id, nombre: val('edNombre'), tipo: val('edGiro'), estatus, tutor: per };
-    Object.assign(r, { nombre: d.nombre, tipo: d.tipo, estatus, tutor: per });
+    const u = datosUbi('ed'); if (u.latitud === r.latitud && u.longitud === r.longitud) u.ubicacion_en = r.ubicacion_capturada_en || '';
+    if ((u.latitud || u.longitud) && !coordsOk(u.latitud, u.longitud)){ aviso('La latitud o la longitud no son válidas.', 'error'); return; }
+    const dom = datosDom('ed');
+    const d = { id: r.id, nombre: val('edNombre'), tipo: val('edGiro'), estatus, tutor: per, ...dom, ...u };
+    Object.assign(r, { nombre: d.nombre, tipo: d.tipo, estatus, tutor: per, ...dom, latitud: u.latitud, longitud: u.longitud, precision_m: u.precision_m, ubicacion_capturada_en: u.ubicacion_en });
     await guardarCache('centros', r);
     await encolar({ uid: nuevoUid(), tipo: 'editarCentro', etiqueta: 'Edición de ' + d.nombre, datos: d });
   } else {
     if (!per.nombre){ aviso('El nombre del becario es obligatorio.', 'error'); return; }
-    const d = { id: r.id, persona: per, correo: val('edCorreo'), celular: val('edCel'), celular_familiar: val('edCelF'), estatus };
-    Object.assign(r, { persona: per, nombre: [per.nombre, per.primer_apellido, per.segundo_apellido].filter(Boolean).join(' '), correo: d.correo, celular: d.celular, celular_familiar: d.celular_familiar, estatus });
+    const d = { id: r.id, persona: per, correo: val('edCorreo'), celular: val('edCel'), celular_familiar: val('edCelF'), estatus, ...datosDom('ed') };
+    Object.assign(r, { persona: per, nombre: [per.nombre, per.primer_apellido, per.segundo_apellido].filter(Boolean).join(' '), correo: d.correo, celular: d.celular, celular_familiar: d.celular_familiar, estatus, ...datosDom('ed') });
     await guardarCache('becarios', r);
     await encolar({ uid: nuevoUid(), tipo: 'editarBecario', etiqueta: 'Edición de ' + r.nombre, datos: d });
   }
@@ -463,6 +579,8 @@ async function sincronizar(){
     }
     const d = await api('descargar');
     await setMeta('centros', d.centros); await setMeta('becarios', d.becarios); await setMeta('ultima', new Date().toLocaleString('es-MX'));
+    try { const cat = await api('catalogo', { version: (await meta('cat_version')) || '' }); if (!cat.igual) await guardarCatalogo(cat); }
+    catch (e) { avisos.push('Catálogo postal: ' + e.message); }
     aviso(`Listo: ${ok} enviados, ${err} con error.` + (avisos.length ? ' Avisos: ' + avisos.join(' ') : ''), err ? 'error' : 'ok');
   } catch (e) { aviso('No se pudo sincronizar: ' + e.message, 'error'); }
   finally { sincronizando = false; document.querySelectorAll('.bsync').forEach(b => b.disabled = false); pintarInicio(); if (CARGAS[actual] && actual !== 'detalle') CARGAS[actual](); }
