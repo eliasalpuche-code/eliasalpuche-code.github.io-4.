@@ -46,10 +46,16 @@ input[type=checkbox]{width:auto;margin-right:6px}
 .item>span:last-child{text-align:right}
 .etq{font-size:.75rem;background:#f0b429;color:#000;border-radius:6px;padding:2px 8px}
 .sub{display:block;margin-top:14px;font-weight:700}
+.pt{cursor:pointer}
+.cp{min-height:30px;padding:2px 8px;margin-left:8px;background:transparent;border:1px solid var(--linea);color:var(--tinta)}
+.clavebox{display:flex;gap:8px}.clavebox button{flex:0 0 52px;padding:0}
+.clave{-webkit-text-security:disc}.clave.visible{-webkit-text-security:none}
+.horario{font-weight:700;margin:6px 0}
+input:not([data-nomay]):not([type=email]):not([type=tel]):not([type=date]):not([type=checkbox]),textarea:not([data-nomay]){text-transform:uppercase}
 #mensaje{position:fixed;left:10px;right:10px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:20;padding:12px;border-radius:10px;color:#fff;font-weight:600;display:none}
 #mensaje.ok{display:block;background:#1b7a4b}#mensaje.error{display:block;background:#b3261e}
-#modalLogin,#modalQR{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px}
-#modalLogin .tarjeta,#modalQR .tarjeta{max-width:420px;width:100%}
+#modalLogin,#modalQR,#modalValidar{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px}
+#modalLogin .tarjeta,#modalQR .tarjeta,#modalValidar .tarjeta{max-width:420px;width:100%}
 </style>
 </head>
 <body>
@@ -68,11 +74,12 @@ input[type=checkbox]{width:auto;margin-right:6px}
 
 <section class="pantalla" id="p-ct"><div class="tarjeta">
   <div class="pasos" id="ind-ct"></div>
-  <div class="paso" data-n="1"><label>Nombre del CT *</label><input id="ctNombre"><label>Giro</label><input id="ctGiro"></div>
+  <div class="paso" data-n="1"><div id="ctDatosCampos"></div></div>
   <div class="paso" data-n="2"><div id="tuCampos"></div></div>
   <div class="paso" data-n="3"><div id="ctDirCampos"></div></div>
-  <div class="paso" data-n="4"><div id="res-ct"></div><label><input type="checkbox" id="ctBorrador">Guardar como borrador (faltan datos)</label></div>
+  <div class="paso" data-n="4"><div id="res-ct"></div><label>Observaciones y comentarios</label><textarea id="ctObs" rows="3"></textarea><label><input type="checkbox" id="ctBorrador">Guardar como borrador (faltan datos)</label></div>
   <div class="fila"><button class="sec" id="ant-ct">Anterior</button><button id="sig-ct">Siguiente</button><button id="gua-ct">Guardar</button></div>
+  <div class="fila"><button class="sec" id="lim-ct">Limpiar formulario</button></div>
 </div></section>
 
 <section class="pantalla" id="p-bc"><div class="tarjeta">
@@ -80,15 +87,16 @@ input[type=checkbox]{width:auto;margin-right:6px}
   <div class="paso" data-n="1"><div id="bcCampos"></div></div>
   <div class="paso" data-n="2"><div id="bcDirCampos"></div></div>
   <div class="paso" data-n="3"><label>Centro de trabajo</label><select id="bcCentro"></select></div>
-  <div class="paso" data-n="4"><div id="res-bc"></div><label><input type="checkbox" id="bcBorrador">Guardar como borrador (faltan datos)</label></div>
+  <div class="paso" data-n="4"><div id="res-bc"></div><label>Observaciones y comentarios</label><textarea id="bcObs" rows="3"></textarea><label><input type="checkbox" id="bcBorrador">Guardar como borrador (faltan datos)</label></div>
   <div class="fila"><button class="sec" id="ant-bc">Anterior</button><button id="sig-bc">Siguiente</button><button id="gua-bc">Guardar</button></div>
+  <div class="fila"><button class="sec" id="lim-bc">Limpiar formulario</button></div>
 </div></section>
 
 <section class="pantalla" id="p-consCT"><input id="busCT" placeholder="Buscar por nombre o ID…"><div class="tarjeta" id="lisCT" style="margin-top:12px"></div></section>
 <section class="pantalla" id="p-consBC"><input id="busBC" placeholder="Buscar por nombre, CURP o ID…"><div class="tarjeta" id="lisBC" style="margin-top:12px"></div></section>
 
 <section class="pantalla" id="p-detalle">
-  <div class="tarjeta"><h2 id="detNombre"></h2><div id="detInfo" class="suave"></div><div id="detDatos"></div><div id="detBec"></div>
+  <div class="tarjeta"><h2 id="detNombre"></h2><div id="detInfo" class="suave"></div><div id="detDatos"></div><div id="detBec"></div><div id="detExtra"></div>
     <div class="fila"><button id="btnEditar">Editar datos</button></div></div>
   <div class="tarjeta oculto" id="edBox"><div id="edCampos"></div>
     <div class="fila"><button class="sec" id="edCancelar">Cancelar</button><button id="edGuardar">Guardar cambios</button></div></div>
@@ -111,6 +119,9 @@ input[type=checkbox]{width:auto;margin-right:6px}
   <div class="fila"><button class="sec" id="qrElegir">Elegir foto</button><button class="sec" id="qrCerrar">Cancelar</button></div>
   <input type="file" id="qrArchivo" accept="image/*" class="oculto"></div></div>
 
+<div id="modalValidar" class="oculto"><div class="tarjeta"><h2>Validar datos</h2><p>¿Confirmas que los datos del centro de trabajo están correctos?</p>
+  <div class="fila"><button class="sec" id="valCancelar">CANCELAR</button><button id="valOk">VALIDAR</button></div></div></div>
+
 <div id="modalLogin" class="oculto"><div class="tarjeta"><h2>Iniciar sesión</h2><p>Para sincronizar se necesita tu cuenta de Google autorizada.</p><div id="botonGoogle"></div><div class="fila"><button class="sec" id="cerrarLogin">Cancelar</button></div></div></div>
 
 <script>
@@ -123,6 +134,7 @@ const $ = id => document.getElementById(id);
 const esc = t => { const d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML.replace(/"/g, '&quot;'); };
 const REGEX_CURP = /^[A-Z][AEIOUX][A-Z]{2}\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[HMX][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z\d]\d$/;
 const ESTADOS = ['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Ciudad de México','Coahuila','Colima','Durango','Guanajuato','Guerrero','Hidalgo','Jalisco','México','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro','Quintana Roo','San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatán','Zacatecas','Nacido en el extranjero'];
+ESTADOS.forEach((e, i) => ESTADOS[i] = e.toUpperCase());
 let token = null;   // solo en memoria
 
 function aviso(t, tipo){ const m = $('mensaje'); m.textContent = t; m.className = tipo; clearTimeout(aviso.t); aviso.t = setTimeout(() => m.className = '', 6000); }
@@ -145,12 +157,12 @@ let seq = 0;
 const nuevoUid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
 async function encolar(op){ op.estado = 'pendiente'; op.creado = Date.now() + (++seq) / 1000; await dbPut('cola', op); pintarInicio(); }
 // Versión 2: formato nuevo de datos descargados. Se descartan los de la versión anterior.
-(async () => { if (await meta('v') !== '2'){ await dbDel('meta', 'centros'); await dbDel('meta', 'becarios'); await setMeta('v', '2'); } })();
+(async () => { if (await meta('v') !== '3'){ await dbDel('meta', 'centros'); await dbDel('meta', 'becarios'); await dbDel('meta', 'cat_version'); await setMeta('v', '3'); } })();
 
 /* ---------- Navegación ---------- */
 const TITULOS = { inicio:'Sistema de alta de centros y becarios', ct:'Alta Centro de Trabajo', bc:'Alta Becario', consCT:'Consulta CT', consBC:'Consulta Becarios', detalle:'Ficha', config:'Configuración' };
 let actual = 'inicio', det = null;
-const CARGAS = { inicio: () => pintarInicio(), ct: () => reiniciar('ct'), bc: () => reiniciar('bc'), consCT: () => listar('ct'), consBC: () => listar('bc'), config: () => pintarConfig() };
+const CARGAS = { inicio: () => pintarInicio(), ct: () => entrarAlta('ct'), bc: () => entrarAlta('bc'), consCT: () => listar('ct'), consBC: () => listar('bc'), config: () => pintarConfig() };
 function ir(id){
   actual = id;
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
@@ -178,15 +190,19 @@ function ligarCurp(p){
     $(p + 'Hint').textContent = v.length === 18 && !REGEX_CURP.test(v) ? 'El formato no parece válido; se marcará para revisión.' : '';
   };
 }
-$('tuCampos').innerHTML = persona('tu');
+const tutorExtra = p => `<label>Correo electrónico</label><input id="${p}Correo" type="email" data-nomay autocapitalize="off" autocomplete="off">
+<label>Contraseña email</label><div class="clavebox"><input id="${p}ClaveEmail" class="clave" data-nomay autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="sec" data-ver="${p}ClaveEmail" aria-label="Mostrar u ocultar">👁</button></div>
+<label>Contraseña plataforma</label><div class="clavebox"><input id="${p}ClavePlat" class="clave" data-nomay autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="sec" data-ver="${p}ClavePlat" aria-label="Mostrar u ocultar">👁</button></div>`;
+$('tuCampos').innerHTML = persona('tu') + tutorExtra('tu');
 $('bcCampos').innerHTML = persona('bc') + contactoBC('bc');
 ligarCurp('tu'); ligarCurp('bc');
-const val = id => $(id).value.trim();
+// Todo se guarda en MAYÚSCULAS, salvo correos, teléfonos y los campos marcados (texto largo, contraseñas).
+const val = id => { const e = $(id), v = e.value.trim(); return (e.dataset.nomay !== undefined || e.type === 'email' || e.type === 'tel') ? v : v.toUpperCase(); };
 const datosPersona = p => ({ curp: val(p + 'Curp'), nombre: val(p + 'Nom'), primer_apellido: val(p + 'Ap1'), segundo_apellido: val(p + 'Ap2'), sexo: $(p + 'Sexo').value, fecha_nacimiento: $(p + 'Fecha').value, estado_nacimiento: $(p + 'Estado').value });
 const nombreCompleto = p => [val(p + 'Nom'), val(p + 'Ap1'), val(p + 'Ap2')].filter(Boolean).join(' ');
 function llenarPersona(p, d){
   $(p + 'Curp').value = d.curp || ''; $(p + 'Ap1').value = d.primer_apellido || ''; $(p + 'Ap2').value = d.segundo_apellido || '';
-  $(p + 'Nom').value = d.nombre || ''; $(p + 'Sexo').value = d.sexo || ''; $(p + 'Fecha').value = d.fecha_nacimiento || ''; $(p + 'Estado').value = d.estado_nacimiento || '';
+  $(p + 'Nom').value = d.nombre || ''; $(p + 'Sexo').value = d.sexo || ''; $(p + 'Fecha').value = d.fecha_nacimiento || ''; fijar($(p + 'Estado'), d.estado_nacimiento);
 }
 
 /* ---------- Lector de QR de la CURP ---------- */
@@ -280,23 +296,82 @@ $('qrArchivo').onchange = e => {
 $('qrCerrar').onclick = cerrarQR;
 document.addEventListener('click', e => { const b = e.target.closest('[data-qr]'); if (b) abrirQR(b.dataset.qr); });
 
+/* ---------- Datos del centro (se reutilizan en el alta y en la edición) ---------- */
+const hLabel = h => (h % 12 || 12) + ' ' + (h % 24 < 12 ? 'AM' : 'PM');
+const horaTxt = v => v ? hLabel(+String(v).slice(0, 2)) : '';
+function fijar(sel, v){   // elige una opción sin distinguir mayúsculas; si no existe, la agrega
+  v = String(v || ''); const o = [...sel.options].find(x => x.value.toUpperCase() === v.toUpperCase());
+  if (o){ sel.value = o.value; return; }
+  if (v) sel.add(new Option(v, v));
+  sel.value = v;
+}
+const camposCT = p => `
+<label>Nombre del CT *</label><input id="${p}Nombre">
+<label>Giro</label><input id="${p}Giro">
+<label>Validado</label><select id="${p}Validado"><option value="NO">NO</option><option value="SI">SI</option></select>
+<div class="dos"><div><label>Becarios solicitados</label><select id="${p}Sol"><option value=""></option>${[1, 2, 3, 4, 5].map(n => `<option>${n}</option>`).join('')}</select></div>
+<div><label>Becarios aceptados</label><select id="${p}Acep"><option value=""></option></select></div></div>
+<label>Días de trabajo</label><select id="${p}Dias"><option value=""></option><option>LUNES A VIERNES</option><option>MARTES A SABADO</option></select>
+<div class="dos"><div><label>Hora de inicio</label><select id="${p}HIni"><option value=""></option>${Array.from({ length: 13 }, (_, i) => i + 5).map(h => `<option value="${String(h).padStart(2, '0')}:00">${hLabel(h)}</option>`).join('')}</select></div>
+<div><label>Horas de trabajo</label><select id="${p}HHoras"><option value=""></option>${[4, 5, 6, 7, 8].map(n => `<option>${n}</option>`).join('')}</select></div></div>
+<label>Hora de salida</label><input id="${p}HSal" readonly>
+<div id="${p}Horario" class="horario"></div>
+<label>Folio plataforma</label><input id="${p}Folio">
+<label>Texto largo (se guarda tal como lo escribes)</label><textarea id="${p}Largo" rows="6" data-nomay></textarea>`;
+function opcionesAceptados(p){
+  const sol = +$(p + 'Sol').value || 0, prev = $(p + 'Acep').value;
+  $(p + 'Acep').innerHTML = '<option value=""></option>' + Array.from({ length: sol }, (_, i) => `<option>${i + 1}</option>`).join('');
+  $(p + 'Acep').value = (+prev && +prev <= sol) ? prev : '';
+}
+function calcHorario(p){
+  const ini = $(p + 'HIni').value, hs = +$(p + 'HHoras').value;
+  if (!ini || !hs){ $(p + 'HSal').value = ''; $(p + 'Horario').textContent = ''; return; }
+  const h = +ini.slice(0, 2), sal = (h + hs) % 24;
+  $(p + 'HSal').value = hLabel(sal); $(p + 'Horario').textContent = 'DE ' + hLabel(h) + ' A ' + hLabel(sal);
+}
+const datosCT = p => ({ nombre: val(p + 'Nombre'), tipo: val(p + 'Giro'), validado: $(p + 'Validado').value || 'NO',
+  becarios_solicitados: $(p + 'Sol').value, becarios_aceptados: $(p + 'Acep').value, dias_trabajo: $(p + 'Dias').value,
+  hora_inicio: $(p + 'HIni').value, horas_trabajo: $(p + 'HHoras').value, folio_plataforma: val(p + 'Folio'), texto_largo: $(p + 'Largo').value.trim() });
+const datosTutorExtra = p => ({ tutor_correo: val(p + 'Correo'), tutor_clave_email: $(p + 'ClaveEmail').value, tutor_clave_plataforma: $(p + 'ClavePlat').value });
+$('ctDatosCampos').innerHTML = camposCT('ct');
+let validarSel = null;
+function pedirValidar(sel){ validarSel = sel; $('modalValidar').classList.remove('oculto'); }
+$('valOk').onclick = () => $('modalValidar').classList.add('oculto');
+$('valCancelar').onclick = () => { if (validarSel) validarSel.value = 'NO'; $('modalValidar').classList.add('oculto'); };
+document.addEventListener('change', e => {
+  const m = /^(ct|ed)(Sol|HIni|HHoras|Validado)$/.exec(e.target.id || ''); if (!m) return;
+  if (m[2] === 'Sol') opcionesAceptados(m[1]);
+  else if (m[2] === 'Validado'){ if (e.target.value === 'SI') pedirValidar(e.target); }
+  else calcHorario(m[1]);
+});
+document.addEventListener('input', e => {   // mayúsculas mientras se escribe
+  const t = e.target;
+  if (!(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) || t.dataset.nomay !== undefined) return;
+  if (t instanceof HTMLInputElement && !['text', 'search', ''].includes(t.type)) return;
+  const a = t.selectionStart, b = t.selectionEnd, v = t.value.toUpperCase();
+  if (v !== t.value){ t.value = v; try { t.setSelectionRange(a, b); } catch (x) {} }
+});
+document.addEventListener('click', e => {   // mostrar u ocultar contraseñas
+  const b = e.target.closest('[data-ver]'); if (b) $(b.dataset.ver).classList.toggle('visible');
+});
+
 /* ---------- Domicilio y ubicación ---------- */
 const CAMPOS_DOM = [['Calle', 'calle'], ['NumExt', 'num_ext'], ['NumInt', 'num_int'], ['Ref', 'referencias'], ['CP', 'cp'], ['Colonia', 'colonia'], ['Municipio', 'municipio'], ['EstadoDom', 'estado'], ['Tipo', 'tipo']];
 const TIPOS_BASE = ['Colonia', 'Fraccionamiento', 'Ejido', 'Barrio', 'Equipamiento', 'Conjunto habitacional', 'Unidad habitacional', 'Condominio', 'Zona industrial', 'Zona federal', 'Ranchería', 'Pueblo', 'Rancho', 'Aeropuerto', 'Paraje', 'Granja', 'Finca', 'Hacienda', 'Puerto'];
-let TIPOS = TIPOS_BASE.slice();
+let TIPOS = TIPOS_BASE.map(t => t.toUpperCase());
 const opcionesTipos = () => '<option value=""></option>' + TIPOS.map(t => `<option>${esc(t)}</option>`).join('');
 function asegurarOpcion(sel, v){ if (v && ![...sel.options].some(o => o.value === v)) sel.add(new Option(v, v)); }
 function refrescarTipos(){ document.querySelectorAll('select[id$="Tipo"]').forEach(s => { const v = s.value; s.innerHTML = opcionesTipos(); asegurarOpcion(s, v); s.value = v; }); }
-(async () => { const t = await meta('tipos'); if (t && t.length){ TIPOS = t; refrescarTipos(); } })();
+(async () => { const t = await meta('tipos'); if (t && t.length){ TIPOS = t.map(x => x.toUpperCase()); refrescarTipos(); } })();
 const direccion = p => `<span class="sub">Domicilio</span>
 <label>Calle</label><input id="${p}Calle">
 <div class="dos"><div><label>Número exterior</label><input id="${p}NumExt"></div><div><label>Número interior</label><input id="${p}NumInt"></div></div>
 <label>Entre calles o referencias</label><input id="${p}Ref">
 <div class="dos"><div><label>Código postal</label><input id="${p}CP" inputmode="numeric" maxlength="5" oninput="buscarCP('${p}')"></div><div><label>Tipo de asentamiento</label><select id="${p}Tipo">${opcionesTipos()}</select></div></div>
 <div class="suave" id="${p}CPMsg"></div>
-<label>Colonia o asentamiento</label><select id="${p}ColSel" class="oculto" onchange="elegirColonia('${p}')"></select>
-<input id="${p}Colonia" placeholder="Escribe la colonia o asentamiento">
-<div class="dos"><div><label>Municipio o alcaldía</label><input id="${p}Municipio"></div><div><label>Estado</label><select id="${p}EstadoDom"><option value=""></option>${ESTADOS.filter(e => e !== 'Nacido en el extranjero').map(e => `<option>${e}</option>`).join('')}</select></div></div>`;
+<label>Colonia</label><select id="${p}ColSel" class="oculto" onchange="elegirColonia('${p}')"></select>
+<input id="${p}Colonia" placeholder="Escribe la colonia">
+<div class="dos"><div><label>Municipio o alcaldía</label><input id="${p}Municipio"></div><div><label>Estado</label><select id="${p}EstadoDom"><option value=""></option>${ESTADOS.filter(e => e !== 'NACIDO EN EL EXTRANJERO').map(e => `<option>${e}</option>`).join('')}</select></div></div>`;
 const ubicacion = p => `<span class="sub">Ubicación del centro de trabajo</span>
 <div class="fila"><button type="button" data-gps="${p}">📍 Capturar ubicación</button></div>
 <div class="hint" id="${p}UbiMsg"></div>
@@ -305,12 +380,12 @@ const ubicacion = p => `<span class="sub">Ubicación del centro de trabajo</span
 <div class="fila"><button type="button" class="sec" data-copiar="${p}:lat">Copiar latitud</button><button type="button" class="sec" data-copiar="${p}:lng">Copiar longitud</button></div>
 <div class="fila"><button type="button" class="sec" data-copiar="${p}:ambas">Copiar ambas</button><button type="button" class="sec" data-mapa="${p}">Abrir Google Maps</button></div>`;
 $('ctDirCampos').innerHTML = direccion('ct') + ubicacion('ct');
-$('bcDirCampos').innerHTML = direccion('bc');
+$('bcDirCampos').innerHTML = direccion('bc') + ubicacion('bc');
 const PREC = {};
 const num = t => String(t).replace(',', '.');
 const coordsOk = (a, b) => { const x = Number(a), y = Number(b); return a !== '' && b !== '' && isFinite(x) && isFinite(y) && Math.abs(x) <= 90 && Math.abs(y) <= 180; };
 const datosDom = p => Object.fromEntries(CAMPOS_DOM.map(([id, k]) => ['dom_' + k, val(p + id)]));
-const llenarDom = (p, r) => CAMPOS_DOM.forEach(([id, k]) => { const v = r['dom_' + k] || ''; if (id === 'Tipo') asegurarOpcion($(p + id), v); $(p + id).value = v; });
+const llenarDom = (p, r) => CAMPOS_DOM.forEach(([id, k]) => { const v = r['dom_' + k] || ''; if (id === 'Tipo' || id === 'EstadoDom') fijar($(p + id), v); else $(p + id).value = v; });
 const datosUbi = p => { const lat = num(val(p + 'Lat')), lng = num(val(p + 'Lng')); return { latitud: lat, longitud: lng, precision_m: PREC[p] || '', ubicacion_en: lat ? localISO() : '' }; };
 function llenarUbi(p, r){ $(p + 'Lat').value = r.latitud || ''; $(p + 'Lng').value = r.longitud || ''; PREC[p] = r.precision_m || ''; pintarPrec(p); $(p + 'UbiMsg').textContent = ''; }
 function pintarPrec(p){ $(p + 'UbiPrec').textContent = PREC[p] ? 'Precisión reportada: ±' + PREC[p] + ' m' : ''; }
@@ -324,14 +399,14 @@ const filasUbi = r => r.latitud ? fila('Latitud', r.latitud) + fila('Longitud', 
 const CPDATA = {};
 async function guardarCatalogo(cat){
   const por = {};
-  cat.filas.forEach(f => (por[f[0]] = por[f[0]] || []).push([f[1], f[2], f[3], f[4]]));
+  cat.filas.forEach(f => (por[f[0]] = por[f[0]] || []).push([f[1], f[2], f[3], f[4]].map(x => String(x).toUpperCase())));
   const db = await dbp;
   await new Promise((ok, no) => {
     const t = db.transaction('cp', 'readwrite'), st = t.objectStore('cp'); st.clear();
     Object.keys(por).forEach(cp => { por[cp].sort((a, b) => a[1].localeCompare(b[1], 'es')); st.put({ cp, items: por[cp] }); });
     t.oncomplete = ok; t.onerror = () => no(t.error);
   });
-  await setMeta('tipos', cat.tipos); await setMeta('cat_version', cat.version);
+  cat.tipos = cat.tipos.map(x => String(x).toUpperCase()); await setMeta('tipos', cat.tipos); await setMeta('cat_version', cat.version);
   if (cat.tipos.length){ TIPOS = cat.tipos; refrescarTipos(); }
 }
 function resetCP(p){ $(p + 'ColSel').classList.add('oculto'); $(p + 'ColSel').innerHTML = ''; $(p + 'Colonia').classList.remove('oculto'); $(p + 'CPMsg').textContent = ''; }
@@ -342,12 +417,12 @@ async function buscarCP(p){
   const reg = await tx('cp', 'readonly', st => st.get(cp));
   if (!reg){ manual((await meta('cat_version')) ? 'Código postal no encontrado en el catálogo. Captura los datos manualmente.' : 'El catálogo postal aún no se descarga: sincroniza una vez con internet. Captura manual por ahora.'); return; }
   CPDATA[p] = reg.items;
-  sel.innerHTML = '<option value="">Elige la colonia…</option>' + reg.items.map((it, i) => `<option value="${i}">${esc(it[1])} (${esc(it[0])})</option>`).join('') + '<option value="otra">Otra (escribir manualmente)</option>';
+  sel.innerHTML = '<option value="">Elige la colonia…</option>' + reg.items.map((it, i) => `<option value="${i}">${esc(it[1])}</option>`).join('') + '<option value="otra">Otra (escribir manualmente)</option>';
   sel.classList.remove('oculto'); inp.classList.add('oculto'); inp.value = '';
   msg.textContent = reg.items.length + ' asentamiento(s) con este código postal. Elige uno de la lista.';
   const muns = [...new Set(reg.items.map(i => i[2]))], ests = [...new Set(reg.items.map(i => i[3]))];
   if (muns.length === 1) $(p + 'Municipio').value = muns[0];
-  if (ests.length === 1) $(p + 'EstadoDom').value = estadoDesdeQR(ests[0]);
+  if (ests.length === 1) fijar($(p + 'EstadoDom'), estadoDesdeQR(ests[0]));
 }
 function elegirColonia(p){
   const sel = $(p + 'ColSel'), inp = $(p + 'Colonia'), v = sel.value;
@@ -355,8 +430,8 @@ function elegirColonia(p){
   inp.classList.add('oculto');
   if (v === ''){ inp.value = ''; return; }
   const it = CPDATA[p][+v];
-  inp.value = it[1]; asegurarOpcion($(p + 'Tipo'), it[0]); $(p + 'Tipo').value = it[0];
-  $(p + 'Municipio').value = it[2]; $(p + 'EstadoDom').value = estadoDesdeQR(it[3]);
+  inp.value = it[1]; $(p + 'CPMsg').textContent = 'El catálogo registra esta colonia como ' + it[0] + '. El tipo de asentamiento se queda como lo elegiste.';
+  $(p + 'Municipio').value = it[2]; fijar($(p + 'EstadoDom'), estadoDesdeQR(it[3]));
 }
 
 function capturarGPS(p){
@@ -390,50 +465,70 @@ document.addEventListener('click', e => {
 
 /* ---------- Altas por pasos ---------- */
 const PASOS = { ct: ['Datos', 'Tutor', 'Dirección', 'Guardar'], bc: ['Datos', 'Dirección', 'Centro', 'Guardar'] };
-const paso = { ct: 1, bc: 1 };
+const paso = { ct: 1, bc: 1 }, sucio = { ct: false, bc: false };
 function pintarPaso(f){
   const n = paso[f];
   document.querySelectorAll(`#p-${f} .paso`).forEach(s => s.classList.toggle('activo', +s.dataset.n === n));
-  $('ind-' + f).innerHTML = PASOS[f].map((t, i) => `<span class="pt ${i + 1 === n ? 'on' : ''} ${i + 1 < n ? 'hecho' : ''}"><b>${i + 1}</b>${t}</span>`).join('');
+  $('ind-' + f).innerHTML = PASOS[f].map((t, i) => `<span class="pt ${i + 1 === n ? 'on' : ''} ${i + 1 < n ? 'hecho' : ''}" data-n="${i + 1}" role="button" tabindex="0"><b>${i + 1}</b>${t}</span>`).join('');
   $('ant-' + f).classList.toggle('oculto', n === 1); $('sig-' + f).classList.toggle('oculto', n === PASOS[f].length); $('gua-' + f).classList.toggle('oculto', n !== PASOS[f].length);
   if (n === PASOS[f].length) resumen(f);
 }
 function validar(f, n){
   const id = f === 'ct' ? 'ctNombre' : 'bcNom';
   if (((f === 'ct' && n === 3) || (f === 'bc' && n === 2)) && val(f + 'CP') && !/^\d{5}$/.test(val(f + 'CP'))){ aviso('El código postal debe tener 5 dígitos.', 'error'); return false; }
-  if (f === 'ct' && n === 3){ const u = datosUbi('ct'); if ((u.latitud || u.longitud) && !coordsOk(u.latitud, u.longitud)){ aviso('La latitud o la longitud no son válidas.', 'error'); return false; } }
+  if ((f === 'ct' && n === 3) || (f === 'bc' && n === 2)){ const u = datosUbi(f); if ((u.latitud || u.longitud) && !coordsOk(u.latitud, u.longitud)){ aviso('La latitud o la longitud no son válidas.', 'error'); return false; } }
   if (n === 1 && !$(id).value.trim()){ aviso('El nombre es obligatorio.', 'error'); $(id).focus(); return false; }
+  return true;
+}
+function revisar(f){   // antes de guardar: revisa todos los pasos y te lleva al que tenga el problema
+  for (const n of [1, 2, 3]) if (!validar(f, n)){ paso[f] = n; pintarPaso(f); return false; }
+  if (f === 'ct' && !$('ctBorrador').checked && !$('ctSol').value){ aviso('Elige cuántos becarios solicita el centro.', 'error'); paso.ct = 1; pintarPaso('ct'); return false; }
   return true;
 }
 ['ct', 'bc'].forEach(f => {
   $('sig-' + f).onclick = () => { if (validar(f, paso[f])){ paso[f]++; pintarPaso(f); } };
   $('ant-' + f).onclick = () => { paso[f]--; pintarPaso(f); };
+  $('ind-' + f).onclick = e => { const s = e.target.closest('.pt'); if (s){ paso[f] = +s.dataset.n; pintarPaso(f); } };   // saltar a cualquier paso sin perder lo capturado
+  ['input', 'change'].forEach(ev => $('p-' + f).addEventListener(ev, () => sucio[f] = true));
+  $('lim-' + f).onclick = () => { if (confirm('¿Borrar todo lo capturado en este formulario?')) reiniciar(f); };
 });
 async function reiniciar(f){
   document.querySelectorAll(`#p-${f} input,#p-${f} select,#p-${f} textarea`).forEach(e => e.type === 'checkbox' ? e.checked = false : e.value = '');
-  paso[f] = 1; ORIGEN.tu = ORIGEN.bc = 'manual'; PREC.ct = ''; pintarPrec('ct'); $('ctUbiMsg').textContent = ''; resetCP('ct'); resetCP('bc'); if (f === 'bc') await llenarCentros(); pintarPaso(f);
+  paso[f] = 1; sucio[f] = false; ORIGEN.tu = ORIGEN.bc = 'manual';
+  PREC.ct = ''; PREC.bc = ''; pintarPrec('ct'); pintarPrec('bc'); $('ctUbiMsg').textContent = ''; $('bcUbiMsg').textContent = ''; resetCP('ct'); resetCP('bc');
+  $('ctValidado').value = 'NO'; $('ctTipo').value = 'COLONIA'; $('bcTipo').value = 'COLONIA'; opcionesAceptados('ct'); calcHorario('ct');
+  await llenarCentros(); pintarPaso(f);
+}
+async function entrarAlta(f){   // si hay algo capturado a medias, se conserva al volver
+  if (!sucio[f]) await reiniciar(f); else { await llenarCentros(); pintarPaso(f); }
 }
 function resumen(f){
+  const ub = val(f + 'Lat') ? val(f + 'Lat') + ', ' + val(f + 'Lng') : 'Sin ubicación';
   const filas = f === 'ct'
-    ? [['Centro', val('ctNombre')], ['Giro', val('ctGiro')], ['Tutor', nombreCompleto('tu')], ['CURP', val('tuCurp')], ['Domicilio', domTexto(datosDom('ct'))], ['Ubicación', val('ctLat') ? val('ctLat') + ', ' + val('ctLng') : 'Sin ubicación']]
-    : [['Becario', nombreCompleto('bc')], ['CURP', val('bcCurp')], ['Domicilio', domTexto(datosDom('bc'))], ['Centro', $('bcCentro').selectedOptions[0] ? $('bcCentro').selectedOptions[0].textContent : '']];
+    ? [['Centro', val('ctNombre')], ['Giro', val('ctGiro')], ['Validado', $('ctValidado').value], ['Becarios solicitados', $('ctSol').value], ['Becarios aceptados', $('ctAcep').value],
+       ['Horario', $('ctHorario').textContent], ['Tutor', nombreCompleto('tu')], ['CURP', val('tuCurp')], ['Domicilio', domTexto(datosDom('ct'))], ['Ubicación', ub]]
+    : [['Becario', nombreCompleto('bc')], ['CURP', val('bcCurp')], ['Domicilio', domTexto(datosDom('bc'))], ['Ubicación', ub],
+       ['Centro', $('bcCentro').selectedOptions[0] ? $('bcCentro').selectedOptions[0].textContent : '']];
   $('res-' + f).innerHTML = filas.map(([a, b]) => `<div class="item"><span class="suave">${a}</span><span>${esc(b) || '—'}</span></div>`).join('');
 }
 $('gua-ct').onclick = async () => {
-  const p = datosPersona('tu'), nombre = val('ctNombre');
-  await encolar({ uid: nuevoUid(), tipo: 'crearCentro', etiqueta: 'Centro: ' + nombre, datos: {
-    nombre, tipo: val('ctGiro'), ...datosDom('ct'), ...datosUbi('ct'), responsable_curp: p.curp, responsable_nombre: p.nombre, responsable_primer_apellido: p.primer_apellido,
-    responsable_segundo_apellido: p.segundo_apellido, responsable_sexo: p.sexo, responsable_fecha_nacimiento: p.fecha_nacimiento,
-    responsable_estado_nacimiento: p.estado_nacimiento, borrador: $('ctBorrador').checked, origen_captura: ORIGEN.tu, capturado_en: localISO() } });
-  aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); ir('inicio');
+  if (!revisar('ct')) return;
+  const p = datosPersona('tu'), c = datosCT('ct');
+  await encolar({ uid: nuevoUid(), tipo: 'crearCentro', etiqueta: 'Centro: ' + c.nombre, datos: { ...c, ...datosDom('ct'), ...datosUbi('ct'), ...datosTutorExtra('tu'),
+    responsable_curp: p.curp, responsable_nombre: p.nombre, responsable_primer_apellido: p.primer_apellido, responsable_segundo_apellido: p.segundo_apellido,
+    responsable_sexo: p.sexo, responsable_fecha_nacimiento: p.fecha_nacimiento, responsable_estado_nacimiento: p.estado_nacimiento,
+    observaciones: val('ctObs'), borrador: $('ctBorrador').checked, origen_captura: ORIGEN.tu, capturado_en: localISO() } });
+  aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); await reiniciar('ct'); ir('inicio');
 };
 $('gua-bc').onclick = async () => {
+  if (!revisar('bc')) return;
   const uid = nuevoUid(), nombre = nombreCompleto('bc'), ahora = localISO();
-  await encolar({ uid, tipo: 'crearBecario', etiqueta: 'Becario: ' + nombre, datos: { ...datosPersona('bc'), ...datosDom('bc'),
-    correo: val('bcCorreo'), celular: val('bcCel'), celular_familiar: val('bcCelF'), borrador: $('bcBorrador').checked, origen_captura: ORIGEN.bc, capturado_en: ahora } });
+  await encolar({ uid, tipo: 'crearBecario', etiqueta: 'Becario: ' + nombre, datos: { ...datosPersona('bc'), ...datosDom('bc'), ...datosUbi('bc'),
+    correo: val('bcCorreo'), celular: val('bcCel'), celular_familiar: val('bcCelF'), observaciones: val('bcObs'),
+    borrador: $('bcBorrador').checked, origen_captura: ORIGEN.bc, capturado_en: ahora } });
   const c = $('bcCentro').value;
   if (c) await encolar({ uid: nuevoUid(), tipo: 'asignar', etiqueta: 'Asignación de ' + nombre, datos: { becario_ref: uid, centro_ref: c, desde: '', fecha: ahora.slice(0, 10) } });
-  aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); ir('inicio');
+  aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); await reiniciar('bc'); ir('inicio');
 };
 
 /* ---------- Centros disponibles (descargados + pendientes locales) ---------- */
@@ -441,22 +536,26 @@ async function centrosDisponibles(){
   const cola = await dbAll('cola'), cache = (await meta('centros')) || [];
   const asign = cola.filter(o => o.tipo === 'asignar');
   const entran = id => asign.filter(o => o.datos.centro_ref === id).length, salen = id => asign.filter(o => o.datos.desde === id).length;
-  const lista = cache.map(c => ({ id: c.id, nombre: c.nombre, estatus: c.estatus, libres: c.lugares_disponibles - entran(c.id) + salen(c.id) }));
-  cola.filter(o => o.tipo === 'crearCentro').forEach(o => lista.push({ id: o.uid, nombre: o.datos.nombre, estatus: o.datos.borrador ? 'borrador' : 'activo', libres: 5 - entran(o.uid), pendiente: true }));
+  const lista = cache.map(c => ({ id: c.id, nombre: c.nombre, estatus: c.estatus, sol: +c.becarios_solicitados || 5, libres: c.lugares_disponibles - entran(c.id) + salen(c.id) }));
+  cola.filter(o => o.tipo === 'crearCentro').forEach(o => { const sol = +o.datos.becarios_solicitados || 5; lista.push({ id: o.uid, nombre: o.datos.nombre, estatus: o.datos.borrador ? 'borrador' : 'activo', sol, libres: sol - entran(o.uid), pendiente: true }); });
   return lista;
 }
 const opcionesCentros = (cs, actualId) => cs.map(c => {
   const off = c.id === actualId || c.libres <= 0 || c.estatus !== 'activo';
-  const nota = c.id === actualId ? 'centro actual' : (c.estatus !== 'activo' ? c.estatus : c.libres + ' lugares libres');
+  const nota = c.id === actualId ? 'centro actual' : (c.estatus !== 'activo' ? c.estatus : (c.libres <= 0 ? 'completo' : c.libres + ' lugares libres'));
   return `<option value="${esc(c.id)}" ${off ? 'disabled' : ''}>${esc(c.nombre)} · ${nota}${c.pendiente ? ' · pendiente' : ''}</option>`;
 }).join('');
-async function llenarCentros(){ $('bcCentro').innerHTML = '<option value="">Sin asignar por ahora</option>' + opcionesCentros(await centrosDisponibles(), ''); }
+async function llenarCentros(){
+  const v = $('bcCentro').value;
+  $('bcCentro').innerHTML = '<option value="">Sin asignar por ahora</option>' + opcionesCentros(await centrosDisponibles(), '');
+  $('bcCentro').value = v;
+}
 
 /* ---------- Consulta ---------- */
 async function listar(t){
   const q = ($(t === 'ct' ? 'busCT' : 'busBC').value || '').toLowerCase();
   let filas;
-  if (t === 'ct') filas = (await centrosDisponibles()).map(c => ({ id: c.id, ti: c.nombre, sub: c.pendiente ? 'Pendiente de sincronizar' : `${c.id} · ${c.estatus} · ${5 - c.libres}/5 becarios`, pendiente: c.pendiente }));
+  if (t === 'ct') filas = (await centrosDisponibles()).map(c => ({ id: c.id, ti: c.nombre, sub: c.pendiente ? 'Pendiente de sincronizar' : `${c.id} · ${c.estatus} · ${c.sol - c.libres}/${c.sol} becarios`, pendiente: c.pendiente }));
   else {
     filas = ((await meta('becarios')) || []).map(b => ({ id: b.id, ti: b.nombre, sub: b.id + ' · ' + (b.centro_nombre || 'Sin centro asignado'), extra: b.persona.curp }));
     (await dbAll('cola')).filter(o => o.tipo === 'crearBecario').forEach(o => filas.push({ id: o.uid, ti: [o.datos.nombre, o.datos.primer_apellido, o.datos.segundo_apellido].filter(Boolean).join(' '), sub: 'Pendiente de sincronizar', pendiente: true }));
@@ -469,8 +568,12 @@ async function listar(t){
 }
 $('busCT').oninput = () => listar('ct'); $('busBC').oninput = () => listar('bc');
 
-/* ---------- Ficha (cardex): resumen de datos con opción de editar ---------- */
-const fila = (a, b) => `<div class="item"><span class="suave">${a}</span><span>${esc(b) || '—'}</span></div>`;
+/* ---------- Ficha (cardex): resumen de datos con opción de editar y copiar ---------- */
+const cpBtn = v => v ? `<button class="cp" type="button" data-cp="${esc(v)}" aria-label="Copiar">📋</button>` : '';
+const fila = (a, b) => `<div class="item"><span class="suave">${a}</span><span>${esc(b) || '—'}${cpBtn(b)}</span></div>`;
+const filaLarga = (a, t) => `<div style="margin-top:10px"><div class="suave">${a}${cpBtn(t)}</div><div style="white-space:pre-wrap;margin-top:4px">${esc(t) || '—'}</div></div>`;
+async function copiarTexto(t){ try { await navigator.clipboard.writeText(t); aviso('Copiado.', 'ok'); } catch (e) { aviso('No se pudo copiar.', 'error'); } }
+document.addEventListener('click', e => { const b = e.target.closest('[data-cp]'); if (b) copiarTexto(b.dataset.cp); });
 const filasPersona = p => fila('Nombre', [p.nombre, p.primer_apellido, p.segundo_apellido].filter(Boolean).join(' ')) + fila('CURP', p.curp) +
   fila('Género', { H: 'Hombre', M: 'Mujer' }[p.sexo] || p.sexo) + fila('Fecha de nacimiento', fechaDMA(p.fecha_nacimiento)) + fila('Estado de nacimiento', p.estado_nacimiento);
 
@@ -479,20 +582,37 @@ async function ficha(t, id){
   ['edBox', 'cambioBox'].forEach(i => $(i).classList.add('oculto'));
   const r = ((await meta(t === 'ct' ? 'centros' : 'becarios')) || []).find(x => x.id === id);
   if (!r){ aviso('No se encontró el registro. Sincroniza e inténtalo de nuevo.', 'error'); return; }
-  det.r = r; $('detBec').innerHTML = '';
+  det.r = r; $('detBec').innerHTML = ''; $('detExtra').innerHTML = '';
+  $('detNombre').textContent = r.nombre; $('detInfo').textContent = r.id + ' · ' + r.estatus;
   if (t === 'ct'){
-    $('detNombre').textContent = r.nombre; $('detInfo').textContent = r.id + ' · ' + r.estatus;
-    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + fila('Giro', r.tipo) + '<span class="sub">Tutor</span>' + filasPersona(r.tutor) + '<span class="sub">Domicilio</span>' + filasDom(r) + '<span class="sub">Ubicación</span>' + filasUbi(r);
-    $('detBec').innerHTML = `<span class="sub">Becarios asignados (${r.becarios.length}/5)</span>` + (r.becarios.map(b => fila(b.nombre, b.id)).join('') || '<p class="suave">Ninguno.</p>');
+    const sol = r.becarios_solicitados || '5';
+    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + fila('Giro', r.tipo) + fila('Validado', r.validado) + fila('Becarios solicitados', r.becarios_solicitados) +
+      fila('Becarios aceptados', r.becarios_aceptados) + fila('Días de trabajo', r.dias_trabajo) + fila('Hora de inicio', horaTxt(r.hora_inicio)) + fila('Horas de trabajo', r.horas_trabajo) +
+      fila('Horario', r.horario) + fila('Folio plataforma', r.folio_plataforma) +
+      '<span class="sub">Tutor</span>' + filasPersona(r.tutor) + fila('Correo', r.tutor_correo) +
+      '<div class="fila"><button class="sec" id="btnClaves">🔑 Ver contraseñas</button></div><div id="detClaves"></div>' +
+      '<span class="sub">Domicilio</span>' + filasDom(r) + '<span class="sub">Ubicación</span>' + filasUbi(r);
+    $('detBec').innerHTML = `<span class="sub">Becarios asignados (${r.becarios.length}/${sol})</span>` + (r.becarios.map(b => fila(b.nombre, b.id)).join('') || '<p class="suave">Ninguno.</p>');
+    $('detExtra').innerHTML = filaLarga('Observaciones y comentarios', r.observaciones) + filaLarga('Texto largo', r.texto_largo);
+    $('btnClaves').onclick = verClaves;
   } else {
-    $('detNombre').textContent = r.nombre; $('detInfo').textContent = r.id + ' · ' + r.estatus;
     const pend = (await dbAll('cola')).some(o => o.tipo === 'asignar' && o.datos.becario_ref === id);
-    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + filasPersona(r.persona) + fila('Correo', r.correo) + fila('Celular', r.celular) + fila('Celular del familiar', r.celular_familiar) + '<span class="sub">Domicilio</span>' + filasDom(r) +
+    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + filasPersona(r.persona) + fila('Correo', r.correo) + fila('Celular', r.celular) + fila('Celular del familiar', r.celular_familiar) +
+      '<span class="sub">Domicilio</span>' + filasDom(r) + '<span class="sub">Ubicación</span>' + filasUbi(r) +
       '<span class="sub">Centro de trabajo</span>' + fila('Centro actual', r.centro_nombre || 'Sin centro asignado') + fila('Asignado desde', fechaDMA(r.fecha_asignacion));
+    $('detExtra').innerHTML = filaLarga('Observaciones y comentarios', r.observaciones);
     $('cambioActual').textContent = (r.centro_nombre ? 'Centro actual: ' + r.centro_nombre : 'Sin centro asignado') + (pend ? ' · Hay un cambio pendiente de sincronizar.' : '');
     $('cbCentro').innerHTML = '<option value="">Elige un centro…</option>' + opcionesCentros(await centrosDisponibles(), r.centro_id);
     $('cambioBox').classList.remove('oculto');
   }
+}
+async function verClaves(){   // las contraseñas no se guardan en el teléfono: se piden al servidor y se ocultan solas
+  if (!token){ aviso('Para ver las contraseñas inicia sesión (botón Sincronizar).', 'error'); pedirLogin(); return; }
+  try {
+    const c = await api('claves', { centro_id: det.id });
+    $('detClaves').innerHTML = fila('Contraseña email', c.clave_email) + fila('Contraseña plataforma', c.clave_plataforma) + '<p class="suave">Se ocultan solas en un minuto y no se guardan en el teléfono.</p>';
+    clearTimeout(verClaves.t); verClaves.t = setTimeout(() => { if ($('detClaves')) $('detClaves').innerHTML = ''; }, 60000);
+  } catch (e) { aviso(e.message, 'error'); }
 }
 $('btnCambiar').onclick = async () => {
   const c = $('cbCentro').value;
@@ -502,14 +622,24 @@ $('btnCambiar').onclick = async () => {
   aviso('Cambio guardado. Pendiente de sincronizar.', 'ok'); ir('inicio');
 };
 
-const ESTATUS_SEL = '<label>Estatus</label><select id="edEstatus"><option value="activo">Activo</option><option value="inactivo">Inactivo</option><option value="borrador">Borrador</option></select>';
+const OBS_ED = '<label>Observaciones y comentarios</label><textarea id="edObs" rows="3"></textarea>';
+const ESTATUS_SEL = '<label>Estatus</label><select id="edEstatus"><option value="activo">ACTIVO</option><option value="inactivo">INACTIVO</option><option value="borrador">BORRADOR</option></select>';
 $('btnEditar').onclick = () => {
   const { t, r } = det;
-  $('edCampos').innerHTML = (t === 'ct' ? '<label>Nombre del CT *</label><input id="edNombre"><label>Giro</label><input id="edGiro">' + ESTATUS_SEL + '<span class="sub">Tutor</span>' + persona('ed') + direccion('ed') + ubicacion('ed')
-    : '<span class="sub">Datos del becario</span>' + persona('ed') + contactoBC('ed') + direccion('ed') + ESTATUS_SEL);
+  $('edCampos').innerHTML = t === 'ct'
+    ? camposCT('ed') + ESTATUS_SEL + '<span class="sub">Tutor</span>' + persona('ed') + tutorExtra('ed') + direccion('ed') + ubicacion('ed') + OBS_ED
+    : '<span class="sub">Datos del becario</span>' + persona('ed') + contactoBC('ed') + direccion('ed') + ubicacion('ed') + ESTATUS_SEL + OBS_ED;
   ligarCurp('ed');
-  if (t === 'ct'){ $('edNombre').value = r.nombre; $('edGiro').value = r.tipo; llenarPersona('ed', r.tutor); llenarDom('ed', r); llenarUbi('ed', r); }
-  else { llenarPersona('ed', r.persona); llenarDom('ed', r); $('edCorreo').value = r.correo; $('edCel').value = r.celular; $('edCelF').value = r.celular_familiar; }
+  if (t === 'ct'){
+    $('edNombre').value = r.nombre; $('edGiro').value = r.tipo; fijar($('edValidado'), r.validado || 'NO'); fijar($('edSol'), r.becarios_solicitados);
+    opcionesAceptados('ed'); fijar($('edAcep'), r.becarios_aceptados); fijar($('edDias'), r.dias_trabajo); fijar($('edHIni'), r.hora_inicio); fijar($('edHHoras'), r.horas_trabajo); calcHorario('ed');
+    $('edFolio').value = r.folio_plataforma || ''; $('edLargo').value = r.texto_largo || '';
+    llenarPersona('ed', r.tutor); $('edCorreo').value = r.tutor_correo || '';
+    $('edClaveEmail').placeholder = $('edClavePlat').placeholder = 'Déjala vacía para no cambiarla';
+  } else {
+    llenarPersona('ed', r.persona); $('edCorreo').value = r.correo; $('edCel').value = r.celular; $('edCelF').value = r.celular_familiar;
+  }
+  llenarDom('ed', r); llenarUbi('ed', r); $('edObs').value = r.observaciones || '';
   $('edEstatus').value = r.estatus; $('edBox').classList.remove('oculto'); $('edBox').scrollIntoView();
 };
 $('edCancelar').onclick = () => $('edBox').classList.add('oculto');
@@ -517,19 +647,26 @@ async function guardarCache(clave, rec){ const arr = (await meta(clave)) || []; 
 $('edGuardar').onclick = async () => {
   const { t, r } = det, per = datosPersona('ed'), estatus = $('edEstatus').value;
   if (val('edCP') && !/^\d{5}$/.test(val('edCP'))){ aviso('El código postal debe tener 5 dígitos.', 'error'); return; }
+  const u = datosUbi('ed'); if (u.latitud === r.latitud && u.longitud === r.longitud) u.ubicacion_en = r.ubicacion_capturada_en || '';
+  if ((u.latitud || u.longitud) && !coordsOk(u.latitud, u.longitud)){ aviso('La latitud o la longitud no son válidas.', 'error'); return; }
+  const dom = datosDom('ed'), obs = val('edObs'), ubi = { latitud: u.latitud, longitud: u.longitud, precision_m: u.precision_m, ubicacion_capturada_en: u.ubicacion_en };
   if (t === 'ct'){
-    if (!val('edNombre')){ aviso('El nombre del CT es obligatorio.', 'error'); return; }
-    const u = datosUbi('ed'); if (u.latitud === r.latitud && u.longitud === r.longitud) u.ubicacion_en = r.ubicacion_capturada_en || '';
-    if ((u.latitud || u.longitud) && !coordsOk(u.latitud, u.longitud)){ aviso('La latitud o la longitud no son válidas.', 'error'); return; }
-    const dom = datosDom('ed');
-    const d = { id: r.id, nombre: val('edNombre'), tipo: val('edGiro'), estatus, tutor: per, ...dom, ...u };
-    Object.assign(r, { nombre: d.nombre, tipo: d.tipo, estatus, tutor: per, ...dom, latitud: u.latitud, longitud: u.longitud, precision_m: u.precision_m, ubicacion_capturada_en: u.ubicacion_en });
+    const c = datosCT('ed');
+    if (!c.nombre){ aviso('El nombre del CT es obligatorio.', 'error'); return; }
+    if (c.becarios_solicitados && +c.becarios_solicitados < r.becarios.length){ aviso('No se pueden solicitar menos becarios de los ya asignados (' + r.becarios.length + ').', 'error'); return; }
+    const ex = datosTutorExtra('ed'); if (!ex.tutor_clave_email) delete ex.tutor_clave_email; if (!ex.tutor_clave_plataforma) delete ex.tutor_clave_plataforma;
+    const d = { id: r.id, ...c, estatus, tutor: per, ...dom, ...u, ...ex, observaciones: obs };
+    const sol = c.becarios_solicitados || r.becarios_solicitados;
+    Object.assign(r, { nombre: c.nombre, tipo: c.tipo, validado: c.validado, becarios_solicitados: sol, becarios_aceptados: c.becarios_aceptados, dias_trabajo: c.dias_trabajo,
+      hora_inicio: c.hora_inicio, horas_trabajo: c.horas_trabajo, horario: $('edHorario').textContent, folio_plataforma: c.folio_plataforma, texto_largo: c.texto_largo,
+      tutor_correo: ex.tutor_correo, observaciones: obs, estatus, tutor: per, lugares_disponibles: (+sol || 5) - r.becarios.length, ...dom, ...ubi });
     await guardarCache('centros', r);
-    await encolar({ uid: nuevoUid(), tipo: 'editarCentro', etiqueta: 'Edición de ' + d.nombre, datos: d });
+    await encolar({ uid: nuevoUid(), tipo: 'editarCentro', etiqueta: 'Edición de ' + c.nombre, datos: d });
   } else {
     if (!per.nombre){ aviso('El nombre del becario es obligatorio.', 'error'); return; }
-    const d = { id: r.id, persona: per, correo: val('edCorreo'), celular: val('edCel'), celular_familiar: val('edCelF'), estatus, ...datosDom('ed') };
-    Object.assign(r, { persona: per, nombre: [per.nombre, per.primer_apellido, per.segundo_apellido].filter(Boolean).join(' '), correo: d.correo, celular: d.celular, celular_familiar: d.celular_familiar, estatus, ...datosDom('ed') });
+    const d = { id: r.id, persona: per, correo: val('edCorreo'), celular: val('edCel'), celular_familiar: val('edCelF'), estatus, ...dom, ...u, observaciones: obs };
+    Object.assign(r, { persona: per, nombre: [per.nombre, per.primer_apellido, per.segundo_apellido].filter(Boolean).join(' '), correo: d.correo, celular: d.celular,
+      celular_familiar: d.celular_familiar, estatus, observaciones: obs, ...dom, ...ubi });
     await guardarCache('becarios', r);
     await encolar({ uid: nuevoUid(), tipo: 'editarBecario', etiqueta: 'Edición de ' + r.nombre, datos: d });
   }
