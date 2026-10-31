@@ -52,10 +52,16 @@ input[type=checkbox]{width:auto;margin-right:6px}
 .clave{-webkit-text-security:disc}.clave.visible{-webkit-text-security:none}
 .horario{font-weight:700;margin:6px 0}
 input:not([data-nomay]):not([type=email]):not([type=tel]):not([type=date]):not([type=checkbox]),textarea:not([data-nomay]){text-transform:uppercase}
+body[data-tema="rojo"]{--azul:#8a4b4b;--btn:#a85d5d;--fondo:#f8eeee;--papel:#fffafa;--linea:#e6cfcf}
+body[data-tema="morado"]{--azul:#5d4b8a;--btn:#7660a8;--fondo:#f1eef8;--papel:#fcfbff;--linea:#d8d0e8}
+@media (prefers-color-scheme:dark){
+  body[data-tema="rojo"]{--azul:#5a2f2f;--btn:#b06a6a;--fondo:#1a1212;--papel:#241a1a;--linea:#3d2a2a}
+  body[data-tema="morado"]{--azul:#3c2f5a;--btn:#8a74bd;--fondo:#15121c;--papel:#1d1926;--linea:#33294a}}
+.item.rojo{border-left:4px solid #c98a8a;padding-left:8px}.item.morado{border-left:4px solid #a999cf;padding-left:8px}
 #mensaje{position:fixed;left:10px;right:10px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:20;padding:12px;border-radius:10px;color:#fff;font-weight:600;display:none}
 #mensaje.ok{display:block;background:#1b7a4b}#mensaje.error{display:block;background:#b3261e}
-#modalLogin,#modalQR,#modalValidar{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px}
-#modalLogin .tarjeta,#modalQR .tarjeta,#modalValidar .tarjeta{max-width:420px;width:100%}
+#modalLogin,#modalQR,#modalValidar,#modalCopiar{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px}
+#modalLogin .tarjeta,#modalQR .tarjeta,#modalValidar .tarjeta,#modalCopiar .tarjeta{max-width:420px;width:100%}
 </style>
 </head>
 <body>
@@ -74,8 +80,8 @@ input:not([data-nomay]):not([type=email]):not([type=tel]):not([type=date]):not([
 
 <section class="pantalla" id="p-ct"><div class="tarjeta">
   <div class="pasos" id="ind-ct"></div>
-  <div class="paso" data-n="1"><div id="ctDatosCampos"></div></div>
-  <div class="paso" data-n="2"><div id="tuCampos"></div></div>
+  <div class="paso" data-n="1"><button type="button" class="sec" id="btnCopiarTutor" style="width:100%">📋 Copiar datos de otro tutor</button><div id="copiadoMsg" class="suave" style="margin-bottom:6px"></div><div id="tuCampos"></div></div>
+  <div class="paso" data-n="2"><div id="ctDatosCampos"></div></div>
   <div class="paso" data-n="3"><div id="ctDirCampos"></div></div>
   <div class="paso" data-n="4"><div id="res-ct"></div><label>Observaciones y comentarios</label><textarea id="ctObs" rows="3"></textarea><label><input type="checkbox" id="ctBorrador">Guardar como borrador (faltan datos)</label></div>
   <div class="fila"><button class="sec" id="ant-ct">Anterior</button><button id="sig-ct">Siguiente</button><button id="gua-ct">Guardar</button></div>
@@ -119,15 +125,20 @@ input:not([data-nomay]):not([type=email]):not([type=tel]):not([type=date]):not([
   <div class="fila"><button class="sec" id="qrElegir">Elegir foto</button><button class="sec" id="qrCerrar">Cancelar</button></div>
   <input type="file" id="qrArchivo" accept="image/*" class="oculto"></div></div>
 
-<div id="modalValidar" class="oculto"><div class="tarjeta"><h2>Validar datos</h2><p>¿Confirmas que los datos del centro de trabajo están correctos?</p>
-  <div class="fila"><button class="sec" id="valCancelar">CANCELAR</button><button id="valOk">VALIDAR</button></div></div></div>
+<div id="modalValidar" class="oculto"><div class="tarjeta"><h2>¿No es elegible?</h2><p>¿Confirmas que este centro de trabajo NO es elegible? Cambiará su color y ya no podrá recibir becarios.</p>
+  <div class="fila"><button class="sec" id="valCancelar">CANCELAR</button><button id="valOk">CONFIRMAR</button></div></div></div>
+
+<div id="modalCopiar" class="oculto"><div class="tarjeta"><h2>Copiar datos de otro tutor</h2>
+  <p class="suave">Copia los datos del centro (giro, horario, dirección, ubicación, observaciones y texto largo). No copia los datos personales del tutor, su correo ni sus contraseñas, ni los becarios.</p>
+  <input id="copBuscar" placeholder="Buscar por nombre o CURP…"><div id="copLista" style="max-height:40vh;overflow:auto;margin-top:8px"></div>
+  <div class="fila"><button class="sec" id="copCerrar">Cancelar</button></div></div></div>
 
 <div id="modalLogin" class="oculto"><div class="tarjeta"><h2>Iniciar sesión</h2><p>Para sincronizar se necesita tu cuenta de Google autorizada.</p><div id="botonGoogle"></div><div class="fila"><button class="sec" id="cerrarLogin">Cancelar</button></div></div></div>
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbzbEgp3KL3ApJyoc0CqVftdTTD28T9iDJIFDB-JhgVtlriTEosd1iz-UUY7Vv3t9ruY/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
 
 const $ = id => document.getElementById(id);
@@ -157,7 +168,7 @@ let seq = 0;
 const nuevoUid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
 async function encolar(op){ op.estado = 'pendiente'; op.creado = Date.now() + (++seq) / 1000; await dbPut('cola', op); pintarInicio(); }
 // Versión 2: formato nuevo de datos descargados. Se descartan los de la versión anterior.
-(async () => { if (await meta('v') !== '3'){ await dbDel('meta', 'centros'); await dbDel('meta', 'becarios'); await dbDel('meta', 'cat_version'); await setMeta('v', '3'); } })();
+(async () => { if (await meta('v') !== '4'){ await dbDel('meta', 'centros'); await dbDel('meta', 'becarios'); await dbDel('meta', 'cat_version'); await setMeta('v', '4'); } })();
 
 /* ---------- Navegación ---------- */
 const TITULOS = { inicio:'Sistema de alta de centros y becarios', ct:'Alta Centro de Trabajo', bc:'Alta Becario', consCT:'Consulta CT', consBC:'Consulta Becarios', detalle:'Ficha', config:'Configuración' };
@@ -167,6 +178,7 @@ function ir(id){
   actual = id;
   document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
   $('p-' + id).classList.add('activa'); $('titulo').textContent = TITULOS[id];
+  if (id !== 'detalle') delete document.body.dataset.tema;
   $('btnAtras').classList.toggle('oculto', id === 'inicio'); window.scrollTo(0, 0);
   if (CARGAS[id]) CARGAS[id]();
 }
@@ -306,9 +318,9 @@ function fijar(sel, v){   // elige una opción sin distinguir mayúsculas; si no
   sel.value = v;
 }
 const camposCT = p => `
-<label>Nombre del CT *</label><input id="${p}Nombre">
+<label>Nombre del CT</label><input id="${p}Nombre">
 <label>Giro</label><input id="${p}Giro">
-<label>Validado</label><select id="${p}Validado"><option value="NO">NO</option><option value="SI">SI</option></select>
+<label>Elegible</label><select id="${p}Elegible"><option value="SI">SI</option><option value="NO">NO</option></select>
 <div class="dos"><div><label>Becarios solicitados</label><select id="${p}Sol"><option value=""></option>${[1, 2, 3, 4, 5].map(n => `<option>${n}</option>`).join('')}</select></div>
 <div><label>Becarios aceptados</label><select id="${p}Acep"><option value=""></option></select></div></div>
 <label>Días de trabajo</label><select id="${p}Dias"><option value=""></option><option>LUNES A VIERNES</option><option>MARTES A SABADO</option></select>
@@ -329,19 +341,19 @@ function calcHorario(p){
   const h = +ini.slice(0, 2), sal = (h + hs) % 24;
   $(p + 'HSal').value = hLabel(sal); $(p + 'Horario').textContent = 'DE ' + hLabel(h) + ' A ' + hLabel(sal);
 }
-const datosCT = p => ({ nombre: val(p + 'Nombre'), tipo: val(p + 'Giro'), validado: $(p + 'Validado').value || 'NO',
+const datosCT = p => ({ nombre: val(p + 'Nombre'), tipo: val(p + 'Giro'), elegible: $(p + 'Elegible').value || 'SI',
   becarios_solicitados: $(p + 'Sol').value, becarios_aceptados: $(p + 'Acep').value, dias_trabajo: $(p + 'Dias').value,
   hora_inicio: $(p + 'HIni').value, horas_trabajo: $(p + 'HHoras').value, folio_plataforma: val(p + 'Folio'), texto_largo: $(p + 'Largo').value.trim() });
 const datosTutorExtra = p => ({ tutor_correo: val(p + 'Correo'), tutor_clave_email: $(p + 'ClaveEmail').value, tutor_clave_plataforma: $(p + 'ClavePlat').value });
 $('ctDatosCampos').innerHTML = camposCT('ct');
-let validarSel = null;
-function pedirValidar(sel){ validarSel = sel; $('modalValidar').classList.remove('oculto'); }
+let elegSel = null;   // al marcar NO ELEGIBLE se pide confirmación (evita errores de dedo)
+function pedirNoElegible(sel){ elegSel = sel; $('modalValidar').classList.remove('oculto'); }
 $('valOk').onclick = () => $('modalValidar').classList.add('oculto');
-$('valCancelar').onclick = () => { if (validarSel) validarSel.value = 'NO'; $('modalValidar').classList.add('oculto'); };
+$('valCancelar').onclick = () => { if (elegSel) elegSel.value = 'SI'; $('modalValidar').classList.add('oculto'); };
 document.addEventListener('change', e => {
-  const m = /^(ct|ed)(Sol|HIni|HHoras|Validado)$/.exec(e.target.id || ''); if (!m) return;
+  const m = /^(ct|ed)(Sol|HIni|HHoras|Elegible)$/.exec(e.target.id || ''); if (!m) return;
   if (m[2] === 'Sol') opcionesAceptados(m[1]);
-  else if (m[2] === 'Validado'){ if (e.target.value === 'SI') pedirValidar(e.target); }
+  else if (m[2] === 'Elegible'){ if (e.target.value === 'NO') pedirNoElegible(e.target); }
   else calcHorario(m[1]);
 });
 document.addEventListener('input', e => {   // mayúsculas mientras se escribe
@@ -464,8 +476,9 @@ document.addEventListener('click', e => {
 });
 
 /* ---------- Altas por pasos ---------- */
-const PASOS = { ct: ['Datos', 'Tutor', 'Dirección', 'Guardar'], bc: ['Datos', 'Dirección', 'Centro', 'Guardar'] };
+const PASOS = { ct: ['Tutor', 'Datos', 'Dirección', 'Guardar'], bc: ['Datos', 'Dirección', 'Centro', 'Guardar'] };
 const paso = { ct: 1, bc: 1 }, sucio = { ct: false, bc: false };
+let COPIADO = '';
 function pintarPaso(f){
   const n = paso[f];
   document.querySelectorAll(`#p-${f} .paso`).forEach(s => s.classList.toggle('activo', +s.dataset.n === n));
@@ -473,16 +486,16 @@ function pintarPaso(f){
   $('ant-' + f).classList.toggle('oculto', n === 1); $('sig-' + f).classList.toggle('oculto', n === PASOS[f].length); $('gua-' + f).classList.toggle('oculto', n !== PASOS[f].length);
   if (n === PASOS[f].length) resumen(f);
 }
-function validar(f, n){
-  const id = f === 'ct' ? 'ctNombre' : 'bcNom';
-  if (((f === 'ct' && n === 3) || (f === 'bc' && n === 2)) && val(f + 'CP') && !/^\d{5}$/.test(val(f + 'CP'))){ aviso('El código postal debe tener 5 dígitos.', 'error'); return false; }
-  if ((f === 'ct' && n === 3) || (f === 'bc' && n === 2)){ const u = datosUbi(f); if ((u.latitud || u.longitud) && !coordsOk(u.latitud, u.longitud)){ aviso('La latitud o la longitud no son válidas.', 'error'); return false; } }
-  if (n === 1 && !$(id).value.trim()){ aviso('El nombre es obligatorio.', 'error'); $(id).focus(); return false; }
+function validar(f, n){   // lo único obligatorio es la CURP; todo lo demás puede quedar en blanco
+  const curp = f === 'ct' ? 'tuCurp' : 'bcCurp';
+  if (n === 1 && !$(curp).value.trim()){ aviso('La CURP es obligatoria.', 'error'); $(curp).focus(); return false; }
+  const dir = (f === 'ct' && n === 3) || (f === 'bc' && n === 2);
+  if (dir && val(f + 'CP') && !/^\d{5}$/.test(val(f + 'CP'))){ aviso('El código postal debe tener 5 dígitos.', 'error'); return false; }
+  if (dir){ const u = datosUbi(f); if ((u.latitud || u.longitud) && !coordsOk(u.latitud, u.longitud)){ aviso('La latitud o la longitud no son válidas.', 'error'); return false; } }
   return true;
 }
 function revisar(f){   // antes de guardar: revisa todos los pasos y te lleva al que tenga el problema
   for (const n of [1, 2, 3]) if (!validar(f, n)){ paso[f] = n; pintarPaso(f); return false; }
-  if (f === 'ct' && !$('ctBorrador').checked && !$('ctSol').value){ aviso('Elige cuántos becarios solicita el centro.', 'error'); paso.ct = 1; pintarPaso('ct'); return false; }
   return true;
 }
 ['ct', 'bc'].forEach(f => {
@@ -494,9 +507,9 @@ function revisar(f){   // antes de guardar: revisa todos los pasos y te lleva al
 });
 async function reiniciar(f){
   document.querySelectorAll(`#p-${f} input,#p-${f} select,#p-${f} textarea`).forEach(e => e.type === 'checkbox' ? e.checked = false : e.value = '');
-  paso[f] = 1; sucio[f] = false; ORIGEN.tu = ORIGEN.bc = 'manual';
+  paso[f] = 1; sucio[f] = false; ORIGEN.tu = ORIGEN.bc = 'manual'; COPIADO = ''; $('copiadoMsg').textContent = '';
   PREC.ct = ''; PREC.bc = ''; pintarPrec('ct'); pintarPrec('bc'); $('ctUbiMsg').textContent = ''; $('bcUbiMsg').textContent = ''; resetCP('ct'); resetCP('bc');
-  $('ctValidado').value = 'NO'; $('ctTipo').value = 'COLONIA'; $('bcTipo').value = 'COLONIA'; opcionesAceptados('ct'); calcHorario('ct');
+  $('ctElegible').value = 'SI'; $('ctTipo').value = 'COLONIA'; $('bcTipo').value = 'COLONIA'; opcionesAceptados('ct'); calcHorario('ct');
   await llenarCentros(); pintarPaso(f);
 }
 async function entrarAlta(f){   // si hay algo capturado a medias, se conserva al volver
@@ -505,8 +518,9 @@ async function entrarAlta(f){   // si hay algo capturado a medias, se conserva a
 function resumen(f){
   const ub = val(f + 'Lat') ? val(f + 'Lat') + ', ' + val(f + 'Lng') : 'Sin ubicación';
   const filas = f === 'ct'
-    ? [['Centro', val('ctNombre')], ['Giro', val('ctGiro')], ['Validado', $('ctValidado').value], ['Becarios solicitados', $('ctSol').value], ['Becarios aceptados', $('ctAcep').value],
-       ['Horario', $('ctHorario').textContent], ['Tutor', nombreCompleto('tu')], ['CURP', val('tuCurp')], ['Domicilio', domTexto(datosDom('ct'))], ['Ubicación', ub]]
+    ? [['Tutor', nombreCompleto('tu')], ['CURP', val('tuCurp')], ['Centro', val('ctNombre')], ['Giro', val('ctGiro')], ['Elegible', $('ctElegible').value],
+       ['Becarios solicitados', $('ctSol').value], ['Becarios aceptados', $('ctAcep').value], ['Horario', $('ctHorario').textContent],
+       ['Domicilio', domTexto(datosDom('ct'))], ['Ubicación', ub]]
     : [['Becario', nombreCompleto('bc')], ['CURP', val('bcCurp')], ['Domicilio', domTexto(datosDom('bc'))], ['Ubicación', ub],
        ['Centro', $('bcCentro').selectedOptions[0] ? $('bcCentro').selectedOptions[0].textContent : '']];
   $('res-' + f).innerHTML = filas.map(([a, b]) => `<div class="item"><span class="suave">${a}</span><span>${esc(b) || '—'}</span></div>`).join('');
@@ -514,15 +528,15 @@ function resumen(f){
 $('gua-ct').onclick = async () => {
   if (!revisar('ct')) return;
   const p = datosPersona('tu'), c = datosCT('ct');
-  await encolar({ uid: nuevoUid(), tipo: 'crearCentro', etiqueta: 'Centro: ' + c.nombre, datos: { ...c, ...datosDom('ct'), ...datosUbi('ct'), ...datosTutorExtra('tu'),
+  await encolar({ uid: nuevoUid(), tipo: 'crearCentro', etiqueta: 'Centro: ' + (c.nombre || p.nombre || p.curp), datos: { ...c, ...datosDom('ct'), ...datosUbi('ct'), ...datosTutorExtra('tu'),
     responsable_curp: p.curp, responsable_nombre: p.nombre, responsable_primer_apellido: p.primer_apellido, responsable_segundo_apellido: p.segundo_apellido,
     responsable_sexo: p.sexo, responsable_fecha_nacimiento: p.fecha_nacimiento, responsable_estado_nacimiento: p.estado_nacimiento,
-    observaciones: val('ctObs'), borrador: $('ctBorrador').checked, origen_captura: ORIGEN.tu, capturado_en: localISO() } });
+    observaciones: val('ctObs'), borrador: $('ctBorrador').checked, copiado_de: COPIADO, origen_captura: ORIGEN.tu, capturado_en: localISO() } });
   aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); await reiniciar('ct'); ir('inicio');
 };
 $('gua-bc').onclick = async () => {
   if (!revisar('bc')) return;
-  const uid = nuevoUid(), nombre = nombreCompleto('bc'), ahora = localISO();
+  const uid = nuevoUid(), nombre = nombreCompleto('bc') || val('bcCurp'), ahora = localISO();
   await encolar({ uid, tipo: 'crearBecario', etiqueta: 'Becario: ' + nombre, datos: { ...datosPersona('bc'), ...datosDom('bc'), ...datosUbi('bc'),
     correo: val('bcCorreo'), celular: val('bcCel'), celular_familiar: val('bcCelF'), observaciones: val('bcObs'),
     borrador: $('bcBorrador').checked, origen_captura: ORIGEN.bc, capturado_en: ahora } });
@@ -531,19 +545,51 @@ $('gua-bc').onclick = async () => {
   aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); await reiniciar('bc'); ir('inicio');
 };
 
+/* ---------- Copiar los datos de otro tutor (para pasar un centro a otra CURP) ---------- */
+const tit = r => r.titulo || r.nombre || (r.persona && r.persona.curp) || (r.tutor && r.tutor.curp) || r.id;
+async function pintarCopiar(){
+  const q = ($('copBuscar').value || '').toLowerCase();
+  const lista = ((await meta('centros')) || []).filter(r => (tit(r) + ' ' + r.id + ' ' + (r.tutor ? r.tutor.curp : '')).toLowerCase().includes(q));
+  $('copLista').innerHTML = lista.length ? lista.map(r => `<div class="item"><div><strong>${esc(tit(r))}</strong><div class="suave">${esc(r.id)} · ${esc(r.tutor ? r.tutor.curp : '')}${r.elegible === 'NO' ? ' · NO ELEGIBLE' : ''}</div></div><button class="sec" data-id="${esc(r.id)}">Copiar</button></div>`).join('')
+    : '<p class="suave">No hay centros descargados. Sincroniza primero.</p>';
+  $('copLista').querySelectorAll('button').forEach(b => b.onclick = async () => copiarDesde(((await meta('centros')) || []).find(x => x.id === b.dataset.id)));
+}
+$('btnCopiarTutor').onclick = () => { $('copBuscar').value = ''; $('modalCopiar').classList.remove('oculto'); pintarCopiar(); };
+$('copBuscar').oninput = pintarCopiar;
+$('copCerrar').onclick = () => $('modalCopiar').classList.add('oculto');
+function copiarDesde(r){   // copia el centro, NO al tutor (CURP, nombre, correo, contraseñas) ni a los becarios
+  if (!r) return;
+  $('ctNombre').value = r.nombre || ''; $('ctGiro').value = r.tipo || '';
+  fijar($('ctSol'), r.becarios_solicitados); opcionesAceptados('ct'); fijar($('ctAcep'), r.becarios_aceptados);
+  fijar($('ctDias'), r.dias_trabajo); fijar($('ctHIni'), r.hora_inicio); fijar($('ctHHoras'), r.horas_trabajo); calcHorario('ct');
+  $('ctFolio').value = r.folio_plataforma || ''; $('ctLargo').value = r.texto_largo || ''; $('ctObs').value = r.observaciones || '';
+  llenarDom('ct', r); llenarUbi('ct', r);
+  COPIADO = r.id; sucio.ct = true;
+  $('copiadoMsg').textContent = 'Datos del centro copiados de ' + tit(r) + ' (' + r.id + '). Captura la CURP y los datos del nuevo tutor.';
+  $('modalCopiar').classList.add('oculto'); aviso('Datos copiados. Falta la CURP del nuevo tutor.', 'ok');
+}
+
 /* ---------- Centros disponibles (descargados + pendientes locales) ---------- */
+const temaDe = (elegible, n) => elegible === 'NO' ? (n > 0 ? 'morado' : 'rojo') : '';   // no elegible con becarios = morado; sin becarios = rojo
 async function centrosDisponibles(){
   const cola = await dbAll('cola'), cache = (await meta('centros')) || [];
   const asign = cola.filter(o => o.tipo === 'asignar');
   const entran = id => asign.filter(o => o.datos.centro_ref === id).length, salen = id => asign.filter(o => o.datos.desde === id).length;
-  const lista = cache.map(c => ({ id: c.id, nombre: c.nombre, estatus: c.estatus, sol: +c.becarios_solicitados || 5, libres: c.lugares_disponibles - entran(c.id) + salen(c.id) }));
-  cola.filter(o => o.tipo === 'crearCentro').forEach(o => { const sol = +o.datos.becarios_solicitados || 5; lista.push({ id: o.uid, nombre: o.datos.nombre, estatus: o.datos.borrador ? 'borrador' : 'activo', sol, libres: sol - entran(o.uid), pendiente: true }); });
+  const lista = cache.map(c => {
+    const sol = +c.becarios_solicitados || 5, n = (c.becarios || []).length + entran(c.id) - salen(c.id), eleg = c.elegible || 'SI';
+    return { id: c.id, titulo: tit(c), curp: c.tutor ? c.tutor.curp : '', estatus: c.estatus, elegible: eleg, sol, n, libres: sol - n, tema: temaDe(eleg, n) };
+  });
+  cola.filter(o => o.tipo === 'crearCentro').forEach(o => {
+    const sol = +o.datos.becarios_solicitados || 5, n = entran(o.uid);
+    lista.push({ id: o.uid, titulo: o.datos.nombre || o.datos.responsable_nombre || o.datos.responsable_curp, curp: o.datos.responsable_curp, estatus: o.datos.borrador ? 'borrador' : 'activo',
+      elegible: o.datos.elegible || 'SI', sol, n, libres: sol - n, tema: '', pendiente: true });
+  });
   return lista;
 }
 const opcionesCentros = (cs, actualId) => cs.map(c => {
-  const off = c.id === actualId || c.libres <= 0 || c.estatus !== 'activo';
-  const nota = c.id === actualId ? 'centro actual' : (c.estatus !== 'activo' ? c.estatus : (c.libres <= 0 ? 'completo' : c.libres + ' lugares libres'));
-  return `<option value="${esc(c.id)}" ${off ? 'disabled' : ''}>${esc(c.nombre)} · ${nota}${c.pendiente ? ' · pendiente' : ''}</option>`;
+  const off = c.id === actualId || c.libres <= 0 || c.estatus !== 'activo' || c.elegible === 'NO';
+  const nota = c.id === actualId ? 'centro actual' : (c.elegible === 'NO' ? 'no elegible' : (c.estatus !== 'activo' ? c.estatus : (c.libres <= 0 ? 'completo' : c.libres + ' lugares libres')));
+  return `<option value="${esc(c.id)}" ${off ? 'disabled' : ''}>${esc(c.titulo)} · ${nota}${c.pendiente ? ' · pendiente' : ''}</option>`;
 }).join('');
 async function llenarCentros(){
   const v = $('bcCentro').value;
@@ -555,14 +601,15 @@ async function llenarCentros(){
 async function listar(t){
   const q = ($(t === 'ct' ? 'busCT' : 'busBC').value || '').toLowerCase();
   let filas;
-  if (t === 'ct') filas = (await centrosDisponibles()).map(c => ({ id: c.id, ti: c.nombre, sub: c.pendiente ? 'Pendiente de sincronizar' : `${c.id} · ${c.estatus} · ${c.sol - c.libres}/${c.sol} becarios`, pendiente: c.pendiente }));
+  if (t === 'ct') filas = (await centrosDisponibles()).map(c => ({ id: c.id, ti: c.titulo, tema: c.tema, extra: c.curp, pendiente: c.pendiente,
+    sub: c.pendiente ? 'Pendiente de sincronizar' : `${c.id} · ${c.estatus} · ${c.n}/${c.sol} becarios` + (c.elegible === 'NO' ? ' · NO ELEGIBLE' : '') }));
   else {
-    filas = ((await meta('becarios')) || []).map(b => ({ id: b.id, ti: b.nombre, sub: b.id + ' · ' + (b.centro_nombre || 'Sin centro asignado'), extra: b.persona.curp }));
-    (await dbAll('cola')).filter(o => o.tipo === 'crearBecario').forEach(o => filas.push({ id: o.uid, ti: [o.datos.nombre, o.datos.primer_apellido, o.datos.segundo_apellido].filter(Boolean).join(' '), sub: 'Pendiente de sincronizar', pendiente: true }));
+    filas = ((await meta('becarios')) || []).map(b => ({ id: b.id, ti: tit(b), sub: b.id + ' · ' + (b.centro_nombre || 'Sin centro asignado'), extra: b.persona.curp }));
+    (await dbAll('cola')).filter(o => o.tipo === 'crearBecario').forEach(o => filas.push({ id: o.uid, ti: [o.datos.nombre, o.datos.primer_apellido, o.datos.segundo_apellido].filter(Boolean).join(' ') || o.datos.curp, sub: 'Pendiente de sincronizar', pendiente: true }));
   }
   filas = filas.filter(f => (f.ti + ' ' + f.id + ' ' + (f.extra || '')).toLowerCase().includes(q));
   const cont = $(t === 'ct' ? 'lisCT' : 'lisBC');
-  cont.innerHTML = filas.length ? filas.map(f => `<div class="item"><div><strong>${esc(f.ti)}</strong><div class="suave">${esc(f.sub)}</div></div>${f.pendiente ? '<span class="etq">pendiente</span>' : `<button class="sec" data-id="${esc(f.id)}">Abrir</button>`}</div>`).join('')
+  cont.innerHTML = filas.length ? filas.map(f => `<div class="item ${f.tema || ''}"><div><strong>${esc(f.ti)}</strong><div class="suave">${esc(f.sub)}</div></div>${f.pendiente ? '<span class="etq">pendiente</span>' : `<button class="sec" data-id="${esc(f.id)}">Abrir</button>`}</div>`).join('')
     : '<p class="suave">Sin resultados. Si es tu primer uso, sincroniza para descargar los centros y becarios.</p>';
   cont.querySelectorAll('button').forEach(b => b.onclick = () => ficha(t, b.dataset.id));
 }
@@ -578,19 +625,22 @@ const filasPersona = p => fila('Nombre', [p.nombre, p.primer_apellido, p.segundo
   fila('Género', { H: 'Hombre', M: 'Mujer' }[p.sexo] || p.sexo) + fila('Fecha de nacimiento', fechaDMA(p.fecha_nacimiento)) + fila('Estado de nacimiento', p.estado_nacimiento);
 
 async function ficha(t, id){
-  det = { t, id }; ir('detalle');
+  det = { t, id }; ir('detalle'); delete document.body.dataset.tema;
   ['edBox', 'cambioBox'].forEach(i => $(i).classList.add('oculto'));
   const r = ((await meta(t === 'ct' ? 'centros' : 'becarios')) || []).find(x => x.id === id);
   if (!r){ aviso('No se encontró el registro. Sincroniza e inténtalo de nuevo.', 'error'); return; }
   det.r = r; $('detBec').innerHTML = ''; $('detExtra').innerHTML = '';
-  $('detNombre').textContent = r.nombre; $('detInfo').textContent = r.id + ' · ' + r.estatus;
+  $('detNombre').textContent = tit(r); $('detInfo').textContent = r.id + ' · ' + r.estatus;
   if (t === 'ct'){
-    const sol = r.becarios_solicitados || '5';
-    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + fila('Giro', r.tipo) + fila('Validado', r.validado) + fila('Becarios solicitados', r.becarios_solicitados) +
-      fila('Becarios aceptados', r.becarios_aceptados) + fila('Días de trabajo', r.dias_trabajo) + fila('Hora de inicio', horaTxt(r.hora_inicio)) + fila('Horas de trabajo', r.horas_trabajo) +
-      fila('Horario', r.horario) + fila('Folio plataforma', r.folio_plataforma) +
+    const sol = r.becarios_solicitados || '5', cola = (await dbAll('cola')).filter(o => o.tipo === 'asignar');
+    const n = r.becarios.length + cola.filter(o => o.datos.centro_ref === r.id).length - cola.filter(o => o.datos.desde === r.id).length;
+    const tm = temaDe(r.elegible || 'SI', n); if (tm) document.body.dataset.tema = tm;   // el color solo cambia en este registro
+    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + fila('Elegible', r.elegible || 'SI') + (r.copiado_de ? fila('Copiado de', r.copiado_de) : '') +
       '<span class="sub">Tutor</span>' + filasPersona(r.tutor) + fila('Correo', r.tutor_correo) +
       '<div class="fila"><button class="sec" id="btnClaves">🔑 Ver contraseñas</button></div><div id="detClaves"></div>' +
+      '<span class="sub">Datos del centro</span>' + fila('Nombre del CT', r.nombre) + fila('Giro', r.tipo) + fila('Becarios solicitados', r.becarios_solicitados) +
+      fila('Becarios aceptados', r.becarios_aceptados) + fila('Días de trabajo', r.dias_trabajo) + fila('Hora de inicio', horaTxt(r.hora_inicio)) + fila('Horas de trabajo', r.horas_trabajo) +
+      fila('Horario', r.horario) + fila('Folio plataforma', r.folio_plataforma) +
       '<span class="sub">Domicilio</span>' + filasDom(r) + '<span class="sub">Ubicación</span>' + filasUbi(r);
     $('detBec').innerHTML = `<span class="sub">Becarios asignados (${r.becarios.length}/${sol})</span>` + (r.becarios.map(b => fila(b.nombre, b.id)).join('') || '<p class="suave">Ninguno.</p>');
     $('detExtra').innerHTML = filaLarga('Observaciones y comentarios', r.observaciones) + filaLarga('Texto largo', r.texto_largo);
@@ -617,7 +667,7 @@ async function verClaves(){   // las contraseñas no se guardan en el teléfono:
 $('btnCambiar').onclick = async () => {
   const c = $('cbCentro').value;
   if (!c){ aviso('Elige el nuevo centro.', 'error'); return; }
-  await encolar({ uid: nuevoUid(), tipo: 'asignar', etiqueta: 'Cambio de centro de ' + det.r.nombre,
+  await encolar({ uid: nuevoUid(), tipo: 'asignar', etiqueta: 'Cambio de centro de ' + tit(det.r),
     datos: { becario_ref: det.id, centro_ref: c, desde: det.r.centro_id || '', fecha: localISO().slice(0, 10) } });
   aviso('Cambio guardado. Pendiente de sincronizar.', 'ok'); ir('inicio');
 };
@@ -627,11 +677,11 @@ const ESTATUS_SEL = '<label>Estatus</label><select id="edEstatus"><option value=
 $('btnEditar').onclick = () => {
   const { t, r } = det;
   $('edCampos').innerHTML = t === 'ct'
-    ? camposCT('ed') + ESTATUS_SEL + '<span class="sub">Tutor</span>' + persona('ed') + tutorExtra('ed') + direccion('ed') + ubicacion('ed') + OBS_ED
+    ? '<span class="sub">Tutor</span>' + persona('ed') + tutorExtra('ed') + '<span class="sub">Datos del centro</span>' + camposCT('ed') + ESTATUS_SEL + direccion('ed') + ubicacion('ed') + OBS_ED
     : '<span class="sub">Datos del becario</span>' + persona('ed') + contactoBC('ed') + direccion('ed') + ubicacion('ed') + ESTATUS_SEL + OBS_ED;
   ligarCurp('ed');
   if (t === 'ct'){
-    $('edNombre').value = r.nombre; $('edGiro').value = r.tipo; fijar($('edValidado'), r.validado || 'NO'); fijar($('edSol'), r.becarios_solicitados);
+    $('edNombre').value = r.nombre || ''; $('edGiro').value = r.tipo || ''; fijar($('edElegible'), r.elegible || 'SI'); fijar($('edSol'), r.becarios_solicitados);
     opcionesAceptados('ed'); fijar($('edAcep'), r.becarios_aceptados); fijar($('edDias'), r.dias_trabajo); fijar($('edHIni'), r.hora_inicio); fijar($('edHHoras'), r.horas_trabajo); calcHorario('ed');
     $('edFolio').value = r.folio_plataforma || ''; $('edLargo').value = r.texto_largo || '';
     llenarPersona('ed', r.tutor); $('edCorreo').value = r.tutor_correo || '';
@@ -646,29 +696,30 @@ $('edCancelar').onclick = () => $('edBox').classList.add('oculto');
 async function guardarCache(clave, rec){ const arr = (await meta(clave)) || []; await setMeta(clave, arr.map(x => x.id === rec.id ? rec : x)); }
 $('edGuardar').onclick = async () => {
   const { t, r } = det, per = datosPersona('ed'), estatus = $('edEstatus').value;
+  if (!per.curp){ aviso('La CURP es obligatoria.', 'error'); return; }
   if (val('edCP') && !/^\d{5}$/.test(val('edCP'))){ aviso('El código postal debe tener 5 dígitos.', 'error'); return; }
   const u = datosUbi('ed'); if (u.latitud === r.latitud && u.longitud === r.longitud) u.ubicacion_en = r.ubicacion_capturada_en || '';
   if ((u.latitud || u.longitud) && !coordsOk(u.latitud, u.longitud)){ aviso('La latitud o la longitud no son válidas.', 'error'); return; }
   const dom = datosDom('ed'), obs = val('edObs'), ubi = { latitud: u.latitud, longitud: u.longitud, precision_m: u.precision_m, ubicacion_capturada_en: u.ubicacion_en };
   if (t === 'ct'){
     const c = datosCT('ed');
-    if (!c.nombre){ aviso('El nombre del CT es obligatorio.', 'error'); return; }
     if (c.becarios_solicitados && +c.becarios_solicitados < r.becarios.length){ aviso('No se pueden solicitar menos becarios de los ya asignados (' + r.becarios.length + ').', 'error'); return; }
     const ex = datosTutorExtra('ed'); if (!ex.tutor_clave_email) delete ex.tutor_clave_email; if (!ex.tutor_clave_plataforma) delete ex.tutor_clave_plataforma;
     const d = { id: r.id, ...c, estatus, tutor: per, ...dom, ...u, ...ex, observaciones: obs };
     const sol = c.becarios_solicitados || r.becarios_solicitados;
-    Object.assign(r, { nombre: c.nombre, tipo: c.tipo, validado: c.validado, becarios_solicitados: sol, becarios_aceptados: c.becarios_aceptados, dias_trabajo: c.dias_trabajo,
+    Object.assign(r, { nombre: c.nombre, tipo: c.tipo, elegible: c.elegible, becarios_solicitados: sol, becarios_aceptados: c.becarios_aceptados, dias_trabajo: c.dias_trabajo,
       hora_inicio: c.hora_inicio, horas_trabajo: c.horas_trabajo, horario: $('edHorario').textContent, folio_plataforma: c.folio_plataforma, texto_largo: c.texto_largo,
       tutor_correo: ex.tutor_correo, observaciones: obs, estatus, tutor: per, lugares_disponibles: (+sol || 5) - r.becarios.length, ...dom, ...ubi });
+    r.titulo = c.nombre || [per.nombre, per.primer_apellido].filter(Boolean).join(' ') || per.curp || r.id;
     await guardarCache('centros', r);
-    await encolar({ uid: nuevoUid(), tipo: 'editarCentro', etiqueta: 'Edición de ' + c.nombre, datos: d });
+    await encolar({ uid: nuevoUid(), tipo: 'editarCentro', etiqueta: 'Edición de ' + r.titulo, datos: d });
   } else {
-    if (!per.nombre){ aviso('El nombre del becario es obligatorio.', 'error'); return; }
     const d = { id: r.id, persona: per, correo: val('edCorreo'), celular: val('edCel'), celular_familiar: val('edCelF'), estatus, ...dom, ...u, observaciones: obs };
     Object.assign(r, { persona: per, nombre: [per.nombre, per.primer_apellido, per.segundo_apellido].filter(Boolean).join(' '), correo: d.correo, celular: d.celular,
       celular_familiar: d.celular_familiar, estatus, observaciones: obs, ...dom, ...ubi });
+    r.titulo = r.nombre || per.curp || r.id;
     await guardarCache('becarios', r);
-    await encolar({ uid: nuevoUid(), tipo: 'editarBecario', etiqueta: 'Edición de ' + r.nombre, datos: d });
+    await encolar({ uid: nuevoUid(), tipo: 'editarBecario', etiqueta: 'Edición de ' + r.titulo, datos: d });
   }
   aviso('Cambios guardados en este teléfono. Pendientes de sincronizar.', 'ok'); ficha(t, r.id);
 };
