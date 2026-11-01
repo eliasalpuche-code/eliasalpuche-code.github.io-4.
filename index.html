@@ -70,6 +70,15 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 .dup.info{background:#fff4d6;color:#6b4e00;border-color:#ecd28a}
 #mensaje{position:fixed;left:10px;right:10px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:20;padding:12px;border-radius:10px;color:#fff;font-weight:600;display:none}
 #mensaje.ok{display:block;background:#1b7a4b}#mensaje.error{display:block;background:#b3261e}
+.fslot{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--linea)}
+.fslot:first-of-type{border-top:0}
+.fth{flex:0 0 64px;height:64px;border-radius:8px;border:1px dashed var(--linea);display:flex;align-items:center;justify-content:center;font-size:1.5rem;overflow:hidden;background:var(--fondo)}
+.fth img{width:100%;height:100%;object-fit:cover}
+.finf{flex:1;min-width:0}.finf b{display:block;font-size:.92rem}
+.fbtn{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}.fbtn button{min-height:36px;padding:4px 10px;font-size:.82rem}
+.fok{color:#1b7a4b}.fpen{color:#8a5f12}
+#modalFoto{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;gap:10px}
+#modalFoto img{max-width:100%;max-height:78vh;border-radius:8px}
 #modalLogin,#modalQR,#modalValidar,#modalCopiar{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px}
 #modalLogin .tarjeta,#modalQR .tarjeta,#modalValidar .tarjeta,#modalCopiar .tarjeta{max-width:420px;width:100%}
 </style>
@@ -93,7 +102,8 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
   <div class="paso" data-n="1"><button type="button" class="sec" id="btnCopiarTutor" style="width:100%">📋 Copiar datos de otro tutor</button><div id="copiadoMsg" class="suave" style="margin-bottom:6px"></div><div id="tuCampos"></div></div>
   <div class="paso" data-n="2"><div id="ctDatosCampos"></div></div>
   <div class="paso" data-n="3"><div id="ctDirCampos"></div></div>
-  <div class="paso" data-n="4"><div id="res-ct"></div><label>Observaciones y comentarios</label><textarea id="ctObs" rows="3"></textarea><label><input type="checkbox" id="ctBorrador">Guardar como borrador (faltan datos)</label></div>
+  <div class="paso" data-n="4"><div id="fotos-ct"></div></div>
+  <div class="paso" data-n="5"><div id="res-ct"></div><label>Observaciones y comentarios</label><textarea id="ctObs" rows="3"></textarea><label><input type="checkbox" id="ctBorrador">Guardar como borrador (faltan datos)</label></div>
   <div class="fila"><button class="sec" id="ant-ct">Anterior</button><button id="sig-ct">Siguiente</button><button id="gua-ct">Guardar</button></div>
   <div class="fila"><button class="sec" id="lim-ct">Limpiar formulario</button></div>
 </div></section>
@@ -103,7 +113,8 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
   <div class="paso" data-n="1"><div id="bcCampos"></div></div>
   <div class="paso" data-n="2"><div id="bcDirCampos"></div></div>
   <div class="paso" data-n="3"><label>Centro de trabajo</label><select id="bcCentro"></select></div>
-  <div class="paso" data-n="4"><div id="res-bc"></div><label>Observaciones y comentarios</label><textarea id="bcObs" rows="3"></textarea><label><input type="checkbox" id="bcBorrador">Guardar como borrador (faltan datos)</label></div>
+  <div class="paso" data-n="4"><div id="fotos-bc"></div></div>
+  <div class="paso" data-n="5"><div id="res-bc"></div><label>Observaciones y comentarios</label><textarea id="bcObs" rows="3"></textarea><label><input type="checkbox" id="bcBorrador">Guardar como borrador (faltan datos)</label></div>
   <div class="fila"><button class="sec" id="ant-bc">Anterior</button><button id="sig-bc">Siguiente</button><button id="gua-bc">Guardar</button></div>
   <div class="fila"><button class="sec" id="lim-bc">Limpiar formulario</button></div>
 </div></section>
@@ -114,6 +125,8 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 <section class="pantalla" id="p-detalle">
   <div class="tarjeta"><h2 id="detNombre"></h2><div id="detInfo" class="suave"></div><div id="detDatos"></div><div id="detBec"></div><div id="detExtra"></div>
     <div class="fila"><button id="btnEditar">Editar datos</button></div></div>
+  <div class="tarjeta" id="fotosBox"><b>📷 Fotografías</b><div id="fotos-fd"></div>
+    <div class="fila"><button id="btnGuardarFotos" class="oculto">Guardar fotos nuevas</button></div></div>
   <div class="tarjeta oculto" id="edBox"><div id="edCampos"></div>
     <div class="fila"><button class="sec" id="edCancelar">Cancelar</button><button id="edGuardar">Guardar cambios</button></div></div>
   <div class="tarjeta oculto" id="cambioBox"><b>Cambiar centro de trabajo</b><div id="cambioActual" class="suave"></div>
@@ -143,12 +156,15 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
   <input id="copBuscar" placeholder="Buscar por nombre o CURP…"><div id="copLista" style="max-height:40vh;overflow:auto;margin-top:8px"></div>
   <div class="fila"><button class="sec" id="copCerrar">Cancelar</button></div></div></div>
 
+<input type="file" id="fotoCam" accept="image/*" capture="environment" class="oculto">
+<input type="file" id="fotoGal" accept="image/*" class="oculto">
+<div id="modalFoto" class="oculto"><img id="fotoGrande" alt="Fotografía"><button class="sec" id="cerrarFoto" style="background:#fff;color:#000">Cerrar</button></div>
 <div id="modalLogin" class="oculto"><div class="tarjeta"><h2>Iniciar sesión</h2><p>Para sincronizar se necesita tu cuenta de Google autorizada.</p><div id="botonGoogle"></div><div class="fila"><button class="sec" id="cerrarLogin">Cancelar</button></div></div></div>
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbysy3T6Lso8u1cTLzqY2DNwzoxfGkX6ow3CqCthMezx5ICDCZVIjdV595Lis6oxcn0C/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
 
 const $ = id => document.getElementById(id);
@@ -576,8 +592,94 @@ document.addEventListener('click', e => {
   const fm = e.target.closest('[data-fm]'); if (fm) abrirMapa(fm.dataset.lat, fm.dataset.lng);
 });
 
+/* ---------- Fotografías: se comprimen en el teléfono y se suben a Drive al sincronizar ---------- */
+const INT = [1, 2, 3, 4, 5].map(i => ['INTERIOR_' + i, 'Interior ' + i]);
+const FOTOS_TUTOR = [['FOTO', 'Foto del tutor'], ['CURP', 'Foto de la CURP'], ['INE_ANVERSO', 'INE anverso'], ['INE_REVERSO', 'INE reverso'], ['COMPROBANTE', 'Comprobante de domicilio']];
+const FOTOS_BECARIO = [['FOTO', 'Foto del becario'], ['CURP', 'Foto de la CURP'], ['INE_ANVERSO', 'INE anverso'], ['INE_REVERSO', 'INE reverso'], ['COMPROBANTE', 'Comprobante de domicilio']];
+const tipoDe = f => f === 'fd' ? det.t : f;
+const defFotos = f => tipoDe(f) === 'ct' ? { tutor: FOTOS_TUTOR, centro: [['FACHADA', 'Fachada del centro'], ...INT] } : { becario: FOTOS_BECARIO };
+const FOTOS = { ct: {}, bc: {}, fd: {} }, REMOTAS = { ct: new Set(), bc: new Set(), fd: new Set() }, PEND = { ct: new Set(), bc: new Set(), fd: new Set() };
+const curpFotos = f => f === 'ct' ? val('tuCurp') : f === 'bc' ? val('bcCurp') : (det.t === 'ct' ? det.r.tutor.curp : det.r.persona.curp);
+const todasClaves = f => Object.values(defFotos(f)).flat().map(x => x[0]);
+function resumenFotos(f){ const n = todasClaves(f).filter(c => FOTOS[f][c]).length; return n ? n + ' foto(s) por subir' : 'Ninguna'; }
+function slotFoto(f, clave, et){
+  const nueva = FOTOS[f][clave], en = REMOTAS[f].has(clave), pend = PEND[f].has(clave);
+  const estado = nueva ? '<span class="fok">Lista · ' + nueva.kb + ' KB · se sube al sincronizar</span>' : pend ? '<span class="fpen">Pendiente de sincronizar</span>' : en ? '<span class="fok">✓ Ya está en Drive</span>' : '<span class="suave">Sin foto</span>';
+  return `<div class="fslot"><div class="fth">${nueva ? `<img src="${nueva.data}" alt="">` : en ? '✅' : '📷'}</div><div class="finf"><b>${et}</b>${estado}
+    <div class="fbtn"><button type="button" class="sec" data-fcam="${f}:${clave}">📷 Cámara</button><button type="button" class="sec" data-fgal="${f}:${clave}">🖼 Galería</button>
+    ${nueva ? `<button type="button" class="sec" data-fdel="${f}:${clave}">✕ Quitar</button>` : ''}${en && !nueva ? `<button type="button" class="sec" data-fver="${f}:${clave}">👁 Ver</button>` : ''}</div></div></div>`;
+}
+function pintarFotos(f){
+  const cont = $('fotos-' + f); if (!cont) return;
+  const d = defFotos(f), partes = [];
+  const titulos = { tutor: 'Del tutor', centro: 'Del centro de trabajo', becario: 'Del becario' };
+  if (f !== 'fd' && !curpFotos(f)) partes.push('<p class="hint">Escribe la CURP en el primer paso: las fotos se guardan con ese nombre.</p>');
+  if (f === 'ct' && COPIADO) partes.push('<p class="suave">Copiaste los datos de ' + esc(COPIADO) + ': su comprobante, fachada e interiores se copiarán solos al sincronizar. Las fotos que tomes aquí los reemplazan.</p>');
+  for (const k of Object.keys(d)){
+    partes.push(`<span class="sub">${titulos[k]}</span>`);
+    let previa = true;
+    d[k].forEach(([clave, et]) => {
+      const interior = /^INTERIOR_(\d)$/.exec(clave), tiene = FOTOS[f][clave] || REMOTAS[f].has(clave) || PEND[f].has(clave);
+      if (interior && +interior[1] > 1 && !tiene && !previa) return;   // los interiores aparecen de uno en uno (máximo 5)
+      partes.push(slotFoto(f, clave, et)); previa = !!tiene;
+    });
+  }
+  cont.innerHTML = partes.join('');
+  if (f === 'fd') $('btnGuardarFotos').classList.toggle('oculto', !todasClaves('fd').some(c => FOTOS.fd[c]));
+}
+async function comprimir(file){   // lado largo máximo 1280 px, JPEG al 70 %
+  let img;
+  try { img = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (x) { img = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = URL.createObjectURL(file); }); }
+  const w0 = img.width || img.naturalWidth, h0 = img.height || img.naturalHeight, k = Math.min(1, 1280 / Math.max(w0, h0));
+  const c = document.createElement('canvas'); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+  if (img.close) img.close();
+  const data = c.toDataURL('image/jpeg', 0.7);
+  return { data, kb: Math.round(data.length * 0.75 / 1024) };
+}
+let FOTO_DEST = null;
+['fotoCam', 'fotoGal'].forEach(id => $(id).addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file || !FOTO_DEST) return;
+  const { f, clave } = FOTO_DEST;
+  try { FOTOS[f][clave] = await comprimir(file); if (f !== 'fd') sucio[f] = true; pintarFotos(f); }
+  catch (x) { aviso('No se pudo leer esa foto. Prueba con otra.', 'error'); }
+}));
+async function verFotoRemota(f, clave){
+  if (!navigator.onLine){ aviso('Para ver la foto se necesita internet.', 'error'); return; }
+  if (!token){ pedirLogin(); return; }
+  aviso('Cargando foto…', 'ok');
+  try { const r = await api('verFoto', { curp: curpFotos(f), clave }); $('fotoGrande').src = r.imagen; $('modalFoto').classList.remove('oculto'); }
+  catch (e) { aviso(e.message, 'error'); }
+}
+$('cerrarFoto').onclick = () => { $('modalFoto').classList.add('oculto'); $('fotoGrande').removeAttribute('src'); };
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-fcam],[data-fgal],[data-fdel],[data-fver]'); if (!t) return;
+  const [f, clave] = (t.dataset.fcam || t.dataset.fgal || t.dataset.fdel || t.dataset.fver).split(':');
+  if (t.dataset.fdel !== undefined){ delete FOTOS[f][clave]; pintarFotos(f); return; }
+  if (t.dataset.fver !== undefined){ verFotoRemota(f, clave); return; }
+  FOTO_DEST = { f, clave }; const i = $(t.dataset.fcam !== undefined ? 'fotoCam' : 'fotoGal'); i.value = ''; i.click();
+});
+async function encolarFotos(f, curp){
+  for (const clave of todasClaves(f)){
+    const x = FOTOS[f][clave]; if (!x) continue;
+    await encolar({ uid: nuevoUid(), tipo: 'subirFoto', etiqueta: 'Foto ' + clave.replace('_', ' ') + ' de ' + curp, datos: { curp, clave, imagen: x.data } });
+  }
+}
+async function pintarFotosFicha(){   // en la ficha: qué hay ya en Drive y qué está pendiente en este teléfono
+  FOTOS.fd = {};
+  const curp = curpFotos('fd'), mapa = (await meta('fotos')) || {};
+  REMOTAS.fd = new Set(mapa[curp] || []);
+  PEND.fd = new Set((await dbAll('cola')).filter(o => o.tipo === 'subirFoto' && o.datos.curp === curp).map(o => o.datos.clave));
+  pintarFotos('fd');
+}
+$('btnGuardarFotos').onclick = async () => {
+  const curp = curpFotos('fd'); if (!curp){ aviso('Este registro no tiene CURP.', 'error'); return; }
+  await encolarFotos('fd', curp); aviso('Fotos guardadas en este teléfono. Se suben al sincronizar.', 'ok'); await pintarFotosFicha();
+};
+
 /* ---------- Altas por pasos ---------- */
-const PASOS = { ct: ['Tutor', 'Datos', 'Dirección', 'Guardar'], bc: ['Datos', 'Dirección', 'Centro', 'Guardar'] };
+const PASOS = { ct: ['Tutor', 'Datos', 'Dirección', 'Fotos', 'Guardar'], bc: ['Datos', 'Dirección', 'Centro', 'Fotos', 'Guardar'] };
 const paso = { ct: 1, bc: 1 }, sucio = { ct: false, bc: false };
 let COPIADO = '';
 function pintarPaso(f){
@@ -585,6 +687,7 @@ function pintarPaso(f){
   document.querySelectorAll(`#p-${f} .paso`).forEach(s => s.classList.toggle('activo', +s.dataset.n === n));
   $('ind-' + f).innerHTML = PASOS[f].map((t, i) => `<span class="pt ${i + 1 === n ? 'on' : ''} ${i + 1 < n ? 'hecho' : ''}" data-n="${i + 1}" role="button" tabindex="0"><b>${i + 1}</b>${t}</span>`).join('');
   $('ant-' + f).classList.toggle('oculto', n === 1); $('sig-' + f).classList.toggle('oculto', n === PASOS[f].length); $('gua-' + f).classList.toggle('oculto', n !== PASOS[f].length);
+  if (n === 4) pintarFotos(f);
   if (n === PASOS[f].length) resumen(f);
 }
 function validar(f, n){   // lo único obligatorio es la CURP; todo lo demás puede quedar en blanco
@@ -635,6 +738,7 @@ async function revisar(f){   // antes de guardar: revisa todos los pasos y te ll
 async function reiniciar(f){
   document.querySelectorAll(`#p-${f} input,#p-${f} select,#p-${f} textarea`).forEach(e => { if (e.type === 'checkbox') e.checked = false; else { e.value = ''; delete e.dataset.manual; } });
   paso[f] = 1; sucio[f] = false; ORIGEN.tu = ORIGEN.bc = 'manual'; COPIADO = ''; $('copiadoMsg').textContent = '';
+  FOTOS[f] = {}; pintarFotos(f);
   PREC.ct = ''; PREC.bc = ''; pintarPrec('ct'); pintarPrec('bc'); $('ctUbiMsg').textContent = ''; $('bcUbiMsg').textContent = ''; resetCP('ct'); resetCP('bc');
   $('tuDup').className = 'dup oculto'; $('bcDup').className = 'dup oculto';
   $('ctElegible').value = 'SI'; $('bcElegible').value = 'SI'; $('ctTipo').value = 'COLONIA'; $('bcTipo').value = 'COLONIA'; opcionesAceptados('ct'); calcHorario('ct'); pintarCE('tu'); pintarCE('bc'); alternarOtro('bc');
@@ -649,8 +753,8 @@ function resumen(f){
   const filas = f === 'ct'
     ? [['Tutor', nombreCompleto('tu')], ['CURP', val('tuCurp')], ['Clave de elector', ceEspaciada(ceString('tu')) || ''], ['Centro', val('ctNombre')], ['Giro', val('ctGiro')], ['Elegible', $('ctElegible').value],
        ['Becarios solicitados', $('ctSol').value], ['Becarios aceptados', $('ctAcep').value], ['Horario', $('ctHorario').textContent],
-       ['Domicilio', domTexto(datosDom('ct'))], ['Ubicación', ub]]
-    : [['Becario', nombreCompleto('bc')], ['CURP', val('bcCurp')], ['Clave de elector', ceEspaciada(ceString('bc')) || ''], ['Elegible', $('bcElegible').value], ['Domicilio', domTexto(datosDom('bc'))], ['Ubicación', ub],
+       ['Domicilio', domTexto(datosDom('ct'))], ['Ubicación', ub], ['Fotografías', resumenFotos('ct')]]
+    : [['Becario', nombreCompleto('bc')], ['CURP', val('bcCurp')], ['Clave de elector', ceEspaciada(ceString('bc')) || ''], ['Elegible', $('bcElegible').value], ['Domicilio', domTexto(datosDom('bc'))], ['Ubicación', ub], ['Fotografías', resumenFotos('bc')],
        ['Centro', $('bcCentro').selectedOptions[0] ? $('bcCentro').selectedOptions[0].textContent : '']];
   $('res-' + f).innerHTML = filas.map(([a, b]) => `<div class="item"><span class="suave">${a}</span><span>${esc(b) || '—'}</span></div>`).join('');
 }
@@ -662,6 +766,7 @@ $('gua-ct').onclick = async () => {
     responsable_sexo: p.sexo, responsable_fecha_nacimiento: p.fecha_nacimiento, responsable_estado_nacimiento: p.estado_nacimiento,
     responsable_clave_elector: p.clave_elector, responsable_seccion: p.seccion,
     observaciones: val('ctObs'), borrador: $('ctBorrador').checked, copiado_de: COPIADO, origen_captura: ORIGEN.tu, capturado_en: localISO() } });
+  await encolarFotos('ct', p.curp);
   aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); await reiniciar('ct'); ir('inicio');
 };
 $('gua-bc').onclick = async () => {
@@ -670,6 +775,7 @@ $('gua-bc').onclick = async () => {
   await encolar({ uid, tipo: 'crearBecario', etiqueta: 'Becario: ' + nombre, datos: { ...datosPersona('bc'), ...datosDom('bc'), ...datosUbi('bc'),
     correo: val('bcCorreo'), celular: val('bcCel'), celular_familiar: val('bcCelF'), ...datosEstudios('bc'), elegible: $('bcElegible').value || 'SI', observaciones: val('bcObs'),
     borrador: $('bcBorrador').checked, origen_captura: ORIGEN.bc, capturado_en: ahora } });
+  await encolarFotos('bc', datosPersona('bc').curp);
   const c = $('bcCentro').value;
   if (c) await encolar({ uid: nuevoUid(), tipo: 'asignar', etiqueta: 'Asignación de ' + nombre, datos: { becario_ref: uid, centro_ref: c, desde: '', fecha: ahora.slice(0, 10) } });
   aviso('Guardado en este teléfono. Pendiente de sincronizar.', 'ok'); await reiniciar('bc'); ir('inicio');
@@ -771,7 +877,7 @@ async function ficha(t, id){
   ['edBox', 'cambioBox'].forEach(i => $(i).classList.add('oculto'));
   const r = ((await meta(t === 'ct' ? 'centros' : 'becarios')) || []).find(x => x.id === id);
   if (!r){ aviso('No se encontró el registro. Sincroniza e inténtalo de nuevo.', 'error'); return; }
-  det.r = r; $('detBec').innerHTML = ''; $('detExtra').innerHTML = '';
+  det.r = r; $('detBec').innerHTML = ''; $('detExtra').innerHTML = ''; await pintarFotosFicha();
   $('detNombre').textContent = tit(r); $('detInfo').textContent = r.id + ' · ' + r.estatus;
   if (t === 'ct'){
     const sol = r.becarios_solicitados || '5', cola = (await dbAll('cola')).filter(o => o.tipo === 'asignar');
@@ -901,8 +1007,10 @@ async function sincronizar(){
   try {
     const ops = (await dbAll('cola')).sort((a, b) => a.creado - b.creado);
     let ok = 0, err = 0; const avisos = [];
-    for (let i = 0; i < ops.length; i += 3){
-      const lote = ops.slice(i, i + 3);
+    for (let i = 0; i < ops.length;){
+      const lote = ops[i].tipo === 'subirFoto' ? [ops[i]] : [];   // cada foto viaja sola (pesa más que el resto)
+      if (!lote.length) while (lote.length < 3 && i + lote.length < ops.length && ops[i + lote.length].tipo !== 'subirFoto') lote.push(ops[i + lote.length]);
+      i += lote.length; aviso(`Sincronizando… ${i} de ${ops.length}`, 'ok');
       const res = await api('sincronizar', { ops: lote.map(o => ({ uid: o.uid, tipo: o.tipo, datos: o.datos })) });
       for (const r of res){
         const o = lote.find(x => x.uid === r.uid);
@@ -911,7 +1019,7 @@ async function sincronizar(){
       }
     }
     const d = await api('descargar');
-    await setMeta('centros', d.centros); await setMeta('becarios', d.becarios); await setMeta('ultima', new Date().toLocaleString('es-MX'));
+    await setMeta('centros', d.centros); await setMeta('becarios', d.becarios); await setMeta('fotos', d.fotos || {}); await setMeta('ultima', new Date().toLocaleString('es-MX'));
     try { const cat = await api('catalogo', { version: (await meta('cat_version')) || '' }); if (!cat.igual) await guardarCatalogo(cat); }
     catch (e) { avisos.push('Catálogo postal: ' + e.message); }
     aviso(`Listo: ${ok} enviados, ${err} con error.` + (avisos.length ? ' Avisos: ' + avisos.join(' ') : ''), err ? 'error' : 'ok');
@@ -936,7 +1044,7 @@ async function pintarConfig(){
 $('btnBorrar').onclick = async () => {
   if ((await dbAll('cola')).length){ aviso('Hay pendientes. Sincroniza antes de borrar.', 'error'); return; }
   if (!confirm('¿Borrar los datos descargados de este teléfono?')) return;
-  for (const k of ['centros', 'becarios', 'usuario', 'ultima']) await dbDel('meta', k);
+  for (const k of ['centros', 'becarios', 'fotos', 'usuario', 'ultima']) await dbDel('meta', k);
   token = null; aviso('Datos locales borrados.', 'ok'); pintarConfig(); pintarInicio();
 };
 let evInst = null;
