@@ -147,10 +147,9 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbzbEgp3KL3ApJyoc0CqVftdTTD28T9iDJIFDB-JhgVtlriTEosd1iz-UUY7Vv3t9ruY/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
-
 
 const $ = id => document.getElementById(id);
 const esc = t => { const d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML.replace(/"/g, '&quot;'); };
@@ -221,12 +220,26 @@ function ligarCurp(p){
     if (v.length === 18) alertaCurp(p); else $(p + 'Dup').className = 'dup oculto';
   };
 }
-const tutorExtra = p => `<label>Correo electrónico</label><input id="${p}Correo" type="email" data-nomay autocapitalize="off" autocomplete="off">
+const tutorExtra = p => `<div class="dos"><div><label>Teléfono 1</label><input id="${p}Tel1" type="tel" inputmode="tel" data-nomay autocomplete="off"></div><div><label>Teléfono 2</label><input id="${p}Tel2" type="tel" inputmode="tel" data-nomay autocomplete="off"></div></div>
+<label>Correo electrónico</label><input id="${p}Correo" type="email" data-nomay autocapitalize="off" autocomplete="off">
 <label>Contraseña email</label><div class="clavebox"><input id="${p}ClaveEmail" class="clave" data-nomay autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="sec" data-ver="${p}ClaveEmail" aria-label="Mostrar u ocultar">👁</button></div>
 <label>Contraseña plataforma</label><div class="clavebox"><input id="${p}ClavePlat" class="clave" data-nomay autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="sec" data-ver="${p}ClavePlat" aria-label="Mostrar u ocultar">👁</button></div>`;
 $('tuCampos').innerHTML = persona('tu') + tutorExtra('tu');
+const estudiosBC = p => `<span class="sub">Último grado de estudios</span>
+<label>Último grado de estudios</label><select id="${p}Grado"><option value=""></option><option>PRIMARIA</option><option>SECUNDARIA</option><option>PREPA O EQUIVALENTE</option><option>UNIVERSIDAD O EQUIVALENTE</option></select>
+<label>Situación del grado</label><select id="${p}EstEstado" data-estotro="${p}"><option value=""></option><option>FINALIZADA</option><option>TRUNCO</option><option>OTRO</option></select>
+<div id="${p}EstOtroBox" class="oculto"><label>¿Cuál?</label><input id="${p}EstOtro" placeholder="Escribe el dato"></div>
+<label>Fecha del último grado</label><input id="${p}EstFecha" type="date">
+<label>Nombre de la escuela</label><input id="${p}EstEscuela">`;
+const alternarOtro = p => $(p + 'EstOtroBox').classList.toggle('oculto', $(p + 'EstEstado').value !== 'OTRO');
+document.addEventListener('change', e => { const s = e.target.closest && e.target.closest('[data-estotro]'); if (s) alternarOtro(s.dataset.estotro); });
+const datosEstudios = p => ({ grado_estudios: $(p + 'Grado').value, estudios_estado: $(p + 'EstEstado').value,
+  estudios_estado_otro: $(p + 'EstEstado').value === 'OTRO' ? val(p + 'EstOtro') : '', estudios_fecha: $(p + 'EstFecha').value, estudios_escuela: val(p + 'EstEscuela') });
+function llenarEstudios(p, r){ fijar($(p + 'Grado'), r.grado_estudios || ''); fijar($(p + 'EstEstado'), r.estudios_estado || ''); $(p + 'EstOtro').value = r.estudios_estado_otro || '';
+  $(p + 'EstFecha').value = r.estudios_fecha || ''; $(p + 'EstEscuela').value = r.estudios_escuela || ''; alternarOtro(p); }
+const filasEstudios = r => fila('Último grado de estudios', r.grado_estudios) + fila('Situación', r.estudios_estado === 'OTRO' ? 'OTRO: ' + (r.estudios_estado_otro || '') : r.estudios_estado) + fila('Fecha del último grado', fechaDMA(r.estudios_fecha)) + fila('Escuela', r.estudios_escuela);
 const elegibleBC = p => `<label>Elegible</label><select id="${p}Elegible"><option value="SI">SI</option><option value="NO">NO</option></select>`;
-$('bcCampos').innerHTML = persona('bc') + contactoBC('bc') + elegibleBC('bc');
+$('bcCampos').innerHTML = persona('bc') + contactoBC('bc') + estudiosBC('bc') + elegibleBC('bc');
 ligarCurp('tu'); ligarCurp('bc');
 // Todo se guarda en MAYÚSCULAS, salvo correos, teléfonos y los campos marcados (texto largo, contraseñas).
 const val = id => { const e = $(id), v = e.value.trim(); return (e.dataset.nomay !== undefined || e.type === 'email' || e.type === 'tel') ? v : v.toUpperCase(); };
@@ -367,7 +380,7 @@ function calcHorario(p){
 const datosCT = p => ({ nombre: val(p + 'Nombre'), tipo: val(p + 'Giro'), elegible: $(p + 'Elegible').value || 'SI',
   becarios_solicitados: $(p + 'Sol').value, becarios_aceptados: $(p + 'Acep').value, dias_trabajo: $(p + 'Dias').value,
   hora_inicio: $(p + 'HIni').value, horas_trabajo: $(p + 'HHoras').value, folio_plataforma: val(p + 'Folio'), texto_largo: $(p + 'Largo').value.trim() });
-const datosTutorExtra = p => ({ tutor_correo: val(p + 'Correo'), tutor_clave_email: $(p + 'ClaveEmail').value, tutor_clave_plataforma: $(p + 'ClavePlat').value });
+const datosTutorExtra = p => ({ tutor_tel1: val(p + 'Tel1'), tutor_tel2: val(p + 'Tel2'), tutor_correo: val(p + 'Correo'), tutor_clave_email: $(p + 'ClaveEmail').value, tutor_clave_plataforma: $(p + 'ClavePlat').value });
 $('ctDatosCampos').innerHTML = camposCT('ct');
 let elegSel = null;   // al marcar NO ELEGIBLE se pide confirmación (evita errores de dedo)
 function pedirNoElegible(sel){
@@ -471,8 +484,9 @@ const ubicacion = p => `<span class="sub">Ubicación del centro de trabajo</span
 <div class="hint" id="${p}UbiMsg"></div>
 <div class="dos"><div><label>Latitud</label><input id="${p}Lat" inputmode="decimal" oninput="PREC['${p}']='';pintarPrec('${p}')"></div><div><label>Longitud</label><input id="${p}Lng" inputmode="decimal" oninput="PREC['${p}']='';pintarPrec('${p}')"></div></div>
 <div id="${p}UbiPrec" class="suave"></div>
-<div class="fila"><button type="button" class="sec" data-copiar="${p}:lat">Copiar latitud</button><button type="button" class="sec" data-copiar="${p}:lng">Copiar longitud</button></div>
-<div class="fila"><button type="button" class="sec" data-copiar="${p}:ambas">Copiar ambas</button><button type="button" class="sec" data-mapa="${p}">Abrir Google Maps</button></div>`;
+<label>Enlace de Google Maps</label>
+<div class="clavebox"><input id="${p}UbiUrl" readonly data-nomay placeholder="Aparece al capturar la ubicación"><button type="button" class="sec" data-copiar="${p}:url" aria-label="Copiar enlace">📋</button></div>
+<div class="fila"><button type="button" class="sec" data-mapa="${p}">Abrir Google Maps</button></div>`;
 $('ctDirCampos').innerHTML = direccion('ct') + ubicacion('ct');
 $('bcDirCampos').innerHTML = direccion('bc') + ubicacion('bc');
 const PREC = {};
@@ -482,12 +496,17 @@ const datosDom = p => Object.fromEntries(CAMPOS_DOM.map(([id, k]) => ['dom_' + k
 const llenarDom = (p, r) => CAMPOS_DOM.forEach(([id, k]) => { const v = r['dom_' + k] || ''; if (id === 'Tipo' || id === 'EstadoDom') fijar($(p + id), v); else $(p + id).value = v; });
 const datosUbi = p => { const lat = num(val(p + 'Lat')), lng = num(val(p + 'Lng')); return { latitud: lat, longitud: lng, precision_m: PREC[p] || '', ubicacion_en: lat ? localISO() : '' }; };
 function llenarUbi(p, r){ $(p + 'Lat').value = r.latitud || ''; $(p + 'Lng').value = r.longitud || ''; PREC[p] = r.precision_m || ''; pintarPrec(p); $(p + 'UbiMsg').textContent = ''; }
-function pintarPrec(p){ $(p + 'UbiPrec').textContent = PREC[p] ? 'Precisión reportada: ±' + PREC[p] + ' m' : ''; }
+const urlMapa = (lat, lng) => lat && lng ? 'https://www.google.com/maps?q=' + encodeURIComponent(lat + ',' + lng) : '';
+function pintarPrec(p){
+  $(p + 'UbiPrec').textContent = PREC[p] ? 'Precisión reportada: ±' + PREC[p] + ' m' : '';
+  const lat = num(val(p + 'Lat')), lng = num(val(p + 'Lng'));
+  $(p + 'UbiUrl').value = coordsOk(lat, lng) ? urlMapa(lat, lng) : '';
+}
 const domTexto = d => [d.dom_calle, d.dom_num_ext && 'No. ' + d.dom_num_ext, d.dom_num_int && 'Int. ' + d.dom_num_int, [d.dom_tipo, d.dom_colonia].filter(Boolean).join(' '), d.dom_cp && 'C.P. ' + d.dom_cp, d.dom_municipio, d.dom_estado].filter(Boolean).join(', ');
 const filasDom = r => fila('Calle', r.dom_calle) + fila('Número exterior', r.dom_num_ext) + fila('Número interior', r.dom_num_int) + fila('Referencias', r.dom_referencias) +
   fila('Código postal', r.dom_cp) + fila('Tipo de asentamiento', r.dom_tipo) + fila('Colonia', r.dom_colonia) + fila('Municipio o alcaldía', r.dom_municipio) + fila('Estado', r.dom_estado);
 const filasUbi = r => r.latitud ? fila('Latitud', r.latitud) + fila('Longitud', r.longitud) + fila('Precisión', r.precision_m ? '±' + r.precision_m + ' m' : '') + fila('Capturada', fechaDMA(r.ubicacion_capturada_en)) +
-  `<div class="fila"><button class="sec" data-fc="ambas" data-lat="${esc(r.latitud)}" data-lng="${esc(r.longitud)}">Copiar coordenadas</button><button class="sec" data-fm data-lat="${esc(r.latitud)}" data-lng="${esc(r.longitud)}">Abrir Google Maps</button></div>`
+  `<div class="fila"><button class="sec" data-fc="ambas" data-lat="${esc(r.latitud)}" data-lng="${esc(r.longitud)}">Copiar coordenadas</button><button class="sec" data-fc="url" data-lat="${esc(r.latitud)}" data-lng="${esc(r.longitud)}">Copiar enlace</button><button class="sec" data-fm data-lat="${esc(r.latitud)}" data-lng="${esc(r.longitud)}">Abrir Google Maps</button></div>`
   : '<p class="suave">Sin ubicación capturada.</p>';
 /* Catálogo postal: al escribir el C.P. se listan los asentamientos y se autollenan tipo, municipio y estado. */
 const CPDATA = {};
@@ -541,12 +560,12 @@ function capturarGPS(p){
 }
 async function copiar(q, lat, lng){
   if (!lat || !lng){ aviso('Todavía no hay coordenadas.', 'error'); return; }
-  const t = q === 'lat' ? lat : q === 'lng' ? lng : lat + ', ' + lng;
+  const t = q === 'url' ? urlMapa(lat, lng) : q === 'lat' ? lat : q === 'lng' ? lng : lat + ', ' + lng;
   try { await navigator.clipboard.writeText(t); aviso('Copiado: ' + t, 'ok'); } catch (x) { aviso('No se pudo copiar.', 'error'); }
 }
 function abrirMapa(lat, lng){
   if (!lat || !lng){ aviso('Todavía no hay coordenadas.', 'error'); return; }
-  window.open('https://www.google.com/maps?q=' + encodeURIComponent(lat + ',' + lng), '_blank', 'noopener');
+  window.open(urlMapa(lat, lng), '_blank', 'noopener');
 }
 document.addEventListener('click', e => {
   const g = e.target.closest('[data-gps]'); if (g){ capturarGPS(g.dataset.gps); return; }
@@ -618,7 +637,7 @@ async function reiniciar(f){
   paso[f] = 1; sucio[f] = false; ORIGEN.tu = ORIGEN.bc = 'manual'; COPIADO = ''; $('copiadoMsg').textContent = '';
   PREC.ct = ''; PREC.bc = ''; pintarPrec('ct'); pintarPrec('bc'); $('ctUbiMsg').textContent = ''; $('bcUbiMsg').textContent = ''; resetCP('ct'); resetCP('bc');
   $('tuDup').className = 'dup oculto'; $('bcDup').className = 'dup oculto';
-  $('ctElegible').value = 'SI'; $('bcElegible').value = 'SI'; $('ctTipo').value = 'COLONIA'; $('bcTipo').value = 'COLONIA'; opcionesAceptados('ct'); calcHorario('ct'); pintarCE('tu'); pintarCE('bc');
+  $('ctElegible').value = 'SI'; $('bcElegible').value = 'SI'; $('ctTipo').value = 'COLONIA'; $('bcTipo').value = 'COLONIA'; opcionesAceptados('ct'); calcHorario('ct'); pintarCE('tu'); pintarCE('bc'); alternarOtro('bc');
   await llenarCentros(); pintarPaso(f);
 }
 async function entrarAlta(f){   // si hay algo capturado a medias, se conserva al volver
@@ -649,7 +668,7 @@ $('gua-bc').onclick = async () => {
   if (!(await revisar('bc'))) return;
   const uid = nuevoUid(), nombre = nombreCompleto('bc') || val('bcCurp'), ahora = localISO();
   await encolar({ uid, tipo: 'crearBecario', etiqueta: 'Becario: ' + nombre, datos: { ...datosPersona('bc'), ...datosDom('bc'), ...datosUbi('bc'),
-    correo: val('bcCorreo'), celular: val('bcCel'), celular_familiar: val('bcCelF'), elegible: $('bcElegible').value || 'SI', observaciones: val('bcObs'),
+    correo: val('bcCorreo'), celular: val('bcCel'), celular_familiar: val('bcCelF'), ...datosEstudios('bc'), elegible: $('bcElegible').value || 'SI', observaciones: val('bcObs'),
     borrador: $('bcBorrador').checked, origen_captura: ORIGEN.bc, capturado_en: ahora } });
   const c = $('bcCentro').value;
   if (c) await encolar({ uid: nuevoUid(), tipo: 'asignar', etiqueta: 'Asignación de ' + nombre, datos: { becario_ref: uid, centro_ref: c, desde: '', fecha: ahora.slice(0, 10) } });
@@ -759,7 +778,7 @@ async function ficha(t, id){
     const n = r.becarios.length + cola.filter(o => o.datos.centro_ref === r.id).length - cola.filter(o => o.datos.desde === r.id).length;
     document.body.dataset.tema = temaCT(r.elegible || 'SI', n);   // el color solo cambia en este registro
     $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + fila('Elegible', r.elegible || 'SI') + (r.copiado_de ? fila('Copiado de', r.copiado_de) : '') +
-      '<span class="sub">Tutor</span>' + filasPersona(r.tutor) + fila('Correo', r.tutor_correo) +
+      '<span class="sub">Tutor</span>' + filasPersona(r.tutor) + fila('Teléfono 1', r.tutor_tel1) + fila('Teléfono 2', r.tutor_tel2) + fila('Correo', r.tutor_correo) +
       '<div class="fila"><button class="sec" id="btnClaves">🔑 Ver contraseñas</button></div><div id="detClaves"></div>' +
       '<span class="sub">Datos del centro</span>' + fila('Nombre del CT', r.nombre) + fila('Giro', r.tipo) + fila('Becarios solicitados', r.becarios_solicitados) +
       fila('Becarios aceptados', r.becarios_aceptados) + fila('Días de trabajo', r.dias_trabajo) + fila('Hora de inicio', horaTxt(r.hora_inicio)) + fila('Horas de trabajo', r.horas_trabajo) +
@@ -772,7 +791,7 @@ async function ficha(t, id){
     const centro = ((await meta('centros')) || []).find(c => c.id === r.centro_id);
     document.body.dataset.tema = temaBC(r, centro);
     const pend = (await dbAll('cola')).some(o => o.tipo === 'asignar' && o.datos.becario_ref === id);
-    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + fila('Elegible', r.elegible || 'SI') + filasPersona(r.persona) + fila('Correo', r.correo) + fila('Celular', r.celular) + fila('Celular del familiar', r.celular_familiar) +
+    $('detDatos').innerHTML = fila('Fecha de alta', fechaDMA(r.fecha_alta)) + fila('Elegible', r.elegible || 'SI') + filasPersona(r.persona) + fila('Correo', r.correo) + fila('Celular', r.celular) + fila('Celular del familiar', r.celular_familiar) + filasEstudios(r) +
       '<span class="sub">Domicilio</span>' + filasDom(r) + '<span class="sub">Ubicación</span>' + filasUbi(r) +
       '<span class="sub">Centro de trabajo</span>' + fila('Centro actual', r.centro_nombre || 'Sin centro asignado') + fila('Asignado desde', fechaDMA(r.fecha_asignacion));
     $('detExtra').innerHTML = filaLarga('Observaciones y comentarios', r.observaciones);
@@ -803,16 +822,16 @@ $('btnEditar').onclick = () => {
   const { t, r } = det;
   $('edCampos').innerHTML = t === 'ct'
     ? '<span class="sub">Tutor</span>' + persona('ed') + tutorExtra('ed') + '<span class="sub">Datos del centro</span>' + camposCT('ed') + ESTATUS_SEL + direccion('ed') + ubicacion('ed') + OBS_ED
-    : '<span class="sub">Datos del becario</span>' + persona('ed') + contactoBC('ed') + elegibleBC('ed') + direccion('ed') + ubicacion('ed') + ESTATUS_SEL + OBS_ED;
+    : '<span class="sub">Datos del becario</span>' + persona('ed') + contactoBC('ed') + estudiosBC('ed') + elegibleBC('ed') + direccion('ed') + ubicacion('ed') + ESTATUS_SEL + OBS_ED;
   ligarCurp('ed');
   if (t === 'ct'){
     $('edNombre').value = r.nombre || ''; $('edGiro').value = r.tipo || ''; fijar($('edElegible'), r.elegible || 'SI'); fijar($('edSol'), r.becarios_solicitados);
     opcionesAceptados('ed'); fijar($('edAcep'), r.becarios_aceptados); fijar($('edDias'), r.dias_trabajo); fijar($('edHIni'), r.hora_inicio); fijar($('edHHoras'), r.horas_trabajo); calcHorario('ed');
     $('edFolio').value = r.folio_plataforma || ''; $('edLargo').value = r.texto_largo || '';
-    llenarPersona('ed', r.tutor); $('edCorreo').value = r.tutor_correo || '';
+    llenarPersona('ed', r.tutor); $('edCorreo').value = r.tutor_correo || ''; $('edTel1').value = r.tutor_tel1 || ''; $('edTel2').value = r.tutor_tel2 || '';
     $('edClaveEmail').placeholder = $('edClavePlat').placeholder = 'Déjala vacía para no cambiarla';
   } else {
-    llenarPersona('ed', r.persona); $('edCorreo').value = r.correo; $('edCel').value = r.celular; $('edCelF').value = r.celular_familiar; fijar($('edElegible'), r.elegible || 'SI');
+    llenarPersona('ed', r.persona); $('edCorreo').value = r.correo; $('edCel').value = r.celular; $('edCelF').value = r.celular_familiar; fijar($('edElegible'), r.elegible || 'SI'); llenarEstudios('ed', r);
   }
   llenarDom('ed', r); llenarUbi('ed', r); $('edObs').value = r.observaciones || '';
   $('edEstatus').value = r.estatus; $('edBox').classList.remove('oculto'); $('edBox').scrollIntoView();
@@ -835,14 +854,14 @@ $('edGuardar').onclick = async () => {
     const sol = c.becarios_solicitados || r.becarios_solicitados;
     Object.assign(r, { nombre: c.nombre, tipo: c.tipo, elegible: c.elegible, becarios_solicitados: sol, becarios_aceptados: c.becarios_aceptados, dias_trabajo: c.dias_trabajo,
       hora_inicio: c.hora_inicio, horas_trabajo: c.horas_trabajo, horario: $('edHorario').textContent, folio_plataforma: c.folio_plataforma, texto_largo: c.texto_largo,
-      tutor_correo: ex.tutor_correo, observaciones: obs, estatus, tutor: per, lugares_disponibles: (+sol || 5) - r.becarios.length, ...dom, ...ubi });
+      tutor_correo: ex.tutor_correo, tutor_tel1: ex.tutor_tel1, tutor_tel2: ex.tutor_tel2, observaciones: obs, estatus, tutor: per, lugares_disponibles: (+sol || 5) - r.becarios.length, ...dom, ...ubi });
     r.titulo = c.nombre || [per.nombre, per.primer_apellido].filter(Boolean).join(' ') || per.curp || r.id;
     await guardarCache('centros', r);
     await encolar({ uid: nuevoUid(), tipo: 'editarCentro', etiqueta: 'Edición de ' + r.titulo, datos: d });
   } else {
-    const d = { id: r.id, persona: per, correo: val('edCorreo'), celular: val('edCel'), celular_familiar: val('edCelF'), estatus, elegible: $('edElegible').value || 'SI', ...dom, ...u, observaciones: obs };
+    const est = datosEstudios('ed'), d = { id: r.id, persona: per, correo: val('edCorreo'), celular: val('edCel'), celular_familiar: val('edCelF'), ...est, estatus, elegible: $('edElegible').value || 'SI', ...dom, ...u, observaciones: obs };
     Object.assign(r, { persona: per, nombre: [per.nombre, per.primer_apellido, per.segundo_apellido].filter(Boolean).join(' '), correo: d.correo, celular: d.celular,
-      celular_familiar: d.celular_familiar, estatus, elegible: d.elegible, observaciones: obs, ...dom, ...ubi });
+      celular_familiar: d.celular_familiar, ...est, estatus, elegible: d.elegible, observaciones: obs, ...dom, ...ubi });
     r.titulo = r.nombre || per.curp || r.id;
     await guardarCache('becarios', r);
     await encolar({ uid: nuevoUid(), tipo: 'editarBecario', etiqueta: 'Edición de ' + r.titulo, datos: d });
