@@ -137,6 +137,7 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 <section class="pantalla" id="p-config">
   <div class="tarjeta"><div id="cfgUsuario" class="suave"></div><div class="fila"><button class="bsync">Sincronizar ahora</button></div><div class="fila"><button id="btnInstalar" class="sec oculto">Instalar app</button></div></div>
   <div class="tarjeta"><b>Pendientes de sincronizar</b><div id="cfgCola"></div></div>
+  <div class="tarjeta"><b>Diagnóstico</b><div id="cfgDiag" class="suave"></div><div class="fila"><button class="sec" id="btnLimpiarDiag">Borrar registro de errores</button></div></div>
   <div class="tarjeta"><button class="sec" id="btnBorrar">Borrar datos locales</button><p class="suave">Solo se puede cuando no hay pendientes. Borra la lista descargada de centros y becarios de este teléfono.</p></div>
 </section>
 </main>
@@ -163,11 +164,10 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbysy3T6Lso8u1cTLzqY2DNwzoxfGkX6ow3CqCthMezx5ICDCZVIjdV595Lis6oxcn0C/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
 
-  
 const $ = id => document.getElementById(id);
 const esc = t => { const d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML.replace(/"/g, '&quot;'); };
 const REGEX_CURP = /^[A-Z][AEIOUX][A-Z]{2}\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[HMX][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z\d]\d$/;
@@ -648,7 +648,7 @@ let FOTO_DEST = null;
   const file = e.target.files[0]; if (!file || !FOTO_DEST) return;
   const { f, clave } = FOTO_DEST;
   try { FOTOS[f][clave] = await comprimir(file); if (f !== 'fd'){ sucio[f] = true; programarBorrador(f); } pintarFotos(f); }
-  catch (x) { aviso('No se pudo leer esa foto. Prueba con otra.', 'error'); }
+  catch (x) { registrarError('foto ' + clave, x); aviso('No se pudo procesar la foto: ' + (x && x.message ? x.message : 'error desconocido'), 'error'); }
 }));
 async function verFotoRemota(f, clave){
   if (!navigator.onLine){ aviso('Para ver la foto se necesita internet.', 'error'); return; }
@@ -1083,7 +1083,24 @@ async function pintarInicio(){
   const n = (await dbAll('cola')).length;
   $('estadoSync').textContent = `${n} pendiente(s) por sincronizar · Última sincronización: ${(await meta('ultima')) || 'nunca'}`;
 }
+const VERSION = '2026-11-02 · fotos + borrador';
+async function registrarError(origen, e){   // guarda los últimos errores para poder verlos en Configuración
+  try {
+    const l = (await meta('errores')) || [];
+    l.unshift({ t: new Date().toLocaleString('es-MX'), o: origen, m: String((e && (e.message || e.reason && e.reason.message)) || e || '').slice(0, 160) });
+    await setMeta('errores', l.slice(0, 8));
+  } catch (x) {}
+}
+addEventListener('error', e => registrarError('error', e.error || e.message));
+addEventListener('unhandledrejection', e => registrarError('promesa', e.reason));
+async function pintarDiag(){
+  const l = (await meta('errores')) || [], mem = navigator.deviceMemory ? ' · RAM que reporta el navegador: ' + navigator.deviceMemory + ' GB' : '';
+  $('cfgDiag').innerHTML = 'Versión de la app: <b>' + VERSION + '</b>' + mem + (await meta('borr_ct') || await meta('borr_bc') ? '<br>Hay un borrador guardado.' : '') +
+    '<br>' + (l.length ? l.map(x => esc(x.t + ' · ' + x.o + ': ' + x.m)).join('<br>') : 'Sin errores registrados.');
+}
+$('btnLimpiarDiag').onclick = async () => { await setMeta('errores', []); pintarDiag(); };
 async function pintarConfig(){
+  pintarDiag();
   $('cfgUsuario').textContent = 'Usuario: ' + ((await meta('usuario')) || 'sin iniciar sesión');
   const cola = (await dbAll('cola')).sort((a, b) => a.creado - b.creado);
   $('cfgCola').innerHTML = cola.length ? cola.map(o => `<div class="item"><div>${esc(o.etiqueta)}<div class="suave">${o.estado === 'error' ? 'Error: ' + esc(o.mensaje) : 'Pendiente'}</div></div><button class="sec" data-d="${esc(o.uid)}">Descartar</button></div>`).join('') : '<p class="suave">No hay pendientes.</p>';
