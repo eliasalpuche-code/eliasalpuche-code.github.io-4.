@@ -77,6 +77,10 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 .finf{flex:1;min-width:0}.finf b{display:block;font-size:.92rem}
 .fbtn{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}.fbtn button{min-height:36px;padding:4px 10px;font-size:.82rem}
 .fok{color:#1b7a4b}.fpen{color:#8a5f12}
+#modalCam{position:fixed;inset:0;background:#000;z-index:45;display:flex;flex-direction:column}
+#camVideo{flex:1;min-height:0;width:100%;object-fit:contain;background:#000}
+#camTitulo{color:#fff;text-align:center;padding:10px;font-weight:600}
+.camBar{display:flex;gap:10px;padding:12px calc(12px + env(safe-area-inset-bottom,0px))}.camBar button{flex:1}
 #modalFoto{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;gap:10px}
 #modalFoto img{max-width:100%;max-height:78vh;border-radius:8px}
 #modalLogin,#modalQR,#modalValidar,#modalCopiar{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -159,14 +163,16 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 
 <input type="file" id="fotoCam" accept="image/*" capture="environment" class="oculto">
 <input type="file" id="fotoGal" accept="image/*" class="oculto">
+<div id="modalCam" class="oculto"><div id="camTitulo"></div><video id="camVideo" playsinline muted autoplay></video><div class="camBar"><button class="sec" id="camCerrar" style="background:#fff;color:#000">Cerrar</button><button id="camTomar">📸 Tomar foto</button></div></div>
 <div id="modalFoto" class="oculto"><img id="fotoGrande" alt="Fotografía"><button class="sec" id="cerrarFoto" style="background:#fff;color:#000">Cerrar</button></div>
 <div id="modalLogin" class="oculto"><div class="tarjeta"><h2>Iniciar sesión</h2><p>Para sincronizar se necesita tu cuenta de Google autorizada.</p><div id="botonGoogle"></div><div class="fila"><button class="sec" id="cerrarLogin">Cancelar</button></div></div></div>
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbysy3T6Lso8u1cTLzqY2DNwzoxfGkX6ow3CqCthMezx5ICDCZVIjdV595Lis6oxcn0C/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
+
 const $ = id => document.getElementById(id);
 const esc = t => { const d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML.replace(/"/g, '&quot;'); };
 const REGEX_CURP = /^[A-Z][AEIOUX][A-Z]{2}\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[HMX][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z\d]\d$/;
@@ -662,8 +668,42 @@ document.addEventListener('click', e => {
   const [f, clave] = (t.dataset.fcam || t.dataset.fgal || t.dataset.fdel || t.dataset.fver).split(':');
   if (t.dataset.fdel !== undefined){ delete FOTOS[f][clave]; pintarFotos(f); return; }
   if (t.dataset.fver !== undefined){ verFotoRemota(f, clave); return; }
-  FOTO_DEST = { f, clave }; const i = $(t.dataset.fcam !== undefined ? 'fotoCam' : 'fotoGal'); i.value = ''; i.click();
+  if (t.dataset.fcam !== undefined){ abrirCamara(f, clave); return; }
+  FOTO_DEST = { f, clave }; const i = $('fotoGal'); i.value = ''; i.click();
 });
+/* Cámara dentro de la app: no se sale a la cámara del teléfono (evita el cierre de la app y el aviso de "memoria insuficiente") */
+let camStream = null, camDest = null;
+function camaraTelefono(f, clave){ FOTO_DEST = { f, clave }; const i = $('fotoCam'); i.value = ''; i.click(); }   // respaldo
+async function abrirCamara(f, clave){
+  camDest = { f, clave };
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ camaraTelefono(f, clave); return; }
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+    const nombre = Object.values(defFotos(f)).flat().find(x => x[0] === clave);
+    $('camTitulo').textContent = nombre ? nombre[1] : 'Foto';
+    $('camVideo').srcObject = camStream; $('modalCam').classList.remove('oculto');
+    try { await $('camVideo').play(); } catch (x) {}
+  } catch (e) {
+    cerrarCamara(); registrarError('camara', e);
+    aviso('No se pudo abrir la cámara dentro de la app (' + (e && e.name ? e.name : 'error') + '). Se usará la cámara del teléfono.', 'error'); camaraTelefono(f, clave);
+  }
+}
+function cerrarCamara(){
+  if (camStream) camStream.getTracks().forEach(t => t.stop());
+  camStream = null; $('camVideo').srcObject = null; $('modalCam').classList.add('oculto');
+}
+$('camCerrar').onclick = cerrarCamara;
+$('camTomar').onclick = () => {
+  const v = $('camVideo'); if (!v.videoWidth || !camDest){ aviso('La cámara todavía no está lista.', 'error'); return; }
+  const k = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight)), c = document.createElement('canvas');
+  c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  const data = c.toDataURL('image/jpeg', 0.7), { f, clave } = camDest;
+  FOTOS[f][clave] = { data, kb: Math.round(data.length * 0.75 / 1024) };
+  if (f !== 'fd'){ sucio[f] = true; programarBorrador(f); }
+  cerrarCamara(); pintarFotos(f);
+};
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && camStream) cerrarCamara(); });
 async function encolarFotos(f, curp){
   for (const clave of todasClaves(f)){
     const x = FOTOS[f][clave]; if (!x) continue;
@@ -1082,7 +1122,7 @@ async function pintarInicio(){
   const n = (await dbAll('cola')).length;
   $('estadoSync').textContent = `${n} pendiente(s) por sincronizar · Última sincronización: ${(await meta('ultima')) || 'nunca'}`;
 }
-const VERSION = '2026-11-02 · fotos + borrador';
+const VERSION = '2026-11-02b · cámara dentro de la app';
 async function registrarError(origen, e){   // guarda los últimos errores para poder verlos en Configuración
   try {
     const l = (await meta('errores')) || [];
