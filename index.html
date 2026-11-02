@@ -163,10 +163,9 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbysy3T6Lso8u1cTLzqY2DNwzoxfGkX6ow3CqCthMezx5ICDCZVIjdV595Lis6oxcn0C/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
-
 
 const $ = id => document.getElementById(id);
 const esc = t => { const d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML.replace(/"/g, '&quot;'); };
@@ -582,6 +581,7 @@ async function copiar(q, lat, lng){
 }
 function abrirMapa(lat, lng){
   if (!lat || !lng){ aviso('Todavía no hay coordenadas.', 'error'); return; }
+  guardarTodosBorr();   // por si el teléfono cierra la app al abrir Maps
   window.open(urlMapa(lat, lng), '_blank', 'noopener');
 }
 document.addEventListener('click', e => {
@@ -630,7 +630,10 @@ function pintarFotos(f){
 }
 async function comprimir(file){   // lado largo máximo 1280 px, JPEG al 70 %
   let img;
-  try { img = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  // Se decodifica YA reducida (ancho 1600): una foto de 64 MP completa no cabe en la memoria de una pestaña de Chrome.
+  try { img = await createImageBitmap(file, { imageOrientation: 'from-image', resizeWidth: 1600, resizeQuality: 'medium' }); }
+  catch (x0) { img = null; }
+  if (!img) try { img = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
   catch (x) { img = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = URL.createObjectURL(file); }); }
   const w0 = img.width || img.naturalWidth, h0 = img.height || img.naturalHeight, k = Math.min(1, 1280 / Math.max(w0, h0));
   const c = document.createElement('canvas'); c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
@@ -643,7 +646,7 @@ let FOTO_DEST = null;
 ['fotoCam', 'fotoGal'].forEach(id => $(id).addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file || !FOTO_DEST) return;
   const { f, clave } = FOTO_DEST;
-  try { FOTOS[f][clave] = await comprimir(file); if (f !== 'fd') sucio[f] = true; pintarFotos(f); }
+  try { FOTOS[f][clave] = await comprimir(file); if (f !== 'fd'){ sucio[f] = true; programarBorrador(f); } pintarFotos(f); }
   catch (x) { aviso('No se pudo leer esa foto. Prueba con otra.', 'error'); }
 }));
 async function verFotoRemota(f, clave){
@@ -689,6 +692,7 @@ function pintarPaso(f){
   $('ind-' + f).innerHTML = PASOS[f].map((t, i) => `<span class="pt ${i + 1 === n ? 'on' : ''} ${i + 1 < n ? 'hecho' : ''}" data-n="${i + 1}" role="button" tabindex="0"><b>${i + 1}</b>${t}</span>`).join('');
   $('ant-' + f).classList.toggle('oculto', n === 1); $('sig-' + f).classList.toggle('oculto', n === PASOS[f].length); $('gua-' + f).classList.toggle('oculto', n !== PASOS[f].length);
   if (n === 4) pintarFotos(f);
+  if (sucio[f]) programarBorrador(f);
   if (n === PASOS[f].length) resumen(f);
 }
 function validar(f, n){   // lo único obligatorio es la CURP; todo lo demás puede quedar en blanco
@@ -743,7 +747,51 @@ async function reiniciar(f){
   PREC.ct = ''; PREC.bc = ''; pintarPrec('ct'); pintarPrec('bc'); $('ctUbiMsg').textContent = ''; $('bcUbiMsg').textContent = ''; resetCP('ct'); resetCP('bc');
   $('tuDup').className = 'dup oculto'; $('bcDup').className = 'dup oculto';
   $('ctElegible').value = 'SI'; $('bcElegible').value = 'SI'; $('ctTipo').value = 'COLONIA'; $('bcTipo').value = 'COLONIA'; opcionesAceptados('ct'); calcHorario('ct'); pintarCE('tu'); pintarCE('bc'); alternarOtro('bc');
-  await llenarCentros(); pintarPaso(f);
+  await dbDel('meta', 'borr_' + f); await llenarCentros(); pintarPaso(f);
+}
+/* ---------- Borrador automático: si el teléfono cierra la app (cámara, Maps, poca memoria) no se pierde lo capturado ---------- */
+const BORR_MS = 30 * 60 * 1000;   // si el borrador es reciente, la app se abre directo en el formulario
+const omitirBorr = e => !e.id || e.type === 'file' || /ColSel$/.test(e.id);
+async function guardarBorrador(f){
+  if (!sucio[f]) return;
+  const vals = {}, checks = {}, manual = [];
+  document.querySelectorAll(`#p-${f} input,#p-${f} select,#p-${f} textarea`).forEach(e => {
+    if (omitirBorr(e)) return;
+    if (e.type === 'checkbox') checks[e.id] = e.checked; else vals[e.id] = e.value;
+    if (e.dataset.manual) manual.push(e.id);
+  });
+  try {
+    await setMeta('borr_' + f, { t: Date.now(), vals, checks, manual, paso: paso[f], origen: ORIGEN[f === 'ct' ? 'tu' : 'bc'],
+      copiado: f === 'ct' ? COPIADO : '', copiadoMsg: f === 'ct' ? $('copiadoMsg').textContent : '', prec: PREC[f] || '', fotos: FOTOS[f] || {} });
+  } catch (e) { /* si no cabe o falla, simplemente no hay borrador */ }
+}
+const temporizadorBorr = {};
+function programarBorrador(f){ clearTimeout(temporizadorBorr[f]); temporizadorBorr[f] = setTimeout(() => guardarBorrador(f), 500); }
+['ct', 'bc'].forEach(f => ['input', 'change'].forEach(ev => $('p-' + f).addEventListener(ev, () => programarBorrador(f))));
+const guardarTodosBorr = () => { ['ct', 'bc'].forEach(f => { clearTimeout(temporizadorBorr[f]); guardarBorrador(f); }); };
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') guardarTodosBorr(); });
+addEventListener('pagehide', guardarTodosBorr);
+async function restaurarBorradores(){   // devuelve el formulario al que conviene volver (si el borrador es reciente)
+  let destino = null, reciente = 0, hubo = false;
+  for (const f of ['ct', 'bc']){
+    const b = await meta('borr_' + f); if (!b || !b.vals) continue;
+    hubo = true; await llenarCentros();
+    for (const [id, v] of Object.entries(b.vals)){
+      const e = $(id); if (!e || id === 'ctAcep') continue;
+      if (e.tagName === 'SELECT'){ if (v === '') e.value = ''; else fijar(e, v); } else e.value = v;
+    }
+    for (const [id, c] of Object.entries(b.checks || {})) if ($(id)) $(id).checked = c;
+    (b.manual || []).forEach(id => { if ($(id)) $(id).dataset.manual = '1'; });
+    opcionesAceptados('ct'); if (b.vals.ctAcep) fijar($('ctAcep'), b.vals.ctAcep);
+    calcHorario('ct'); pintarCE('tu'); pintarCE('bc'); alternarOtro('bc');
+    paso[f] = b.paso || 1; sucio[f] = true; FOTOS[f] = b.fotos || {}; PREC[f] = b.prec || '';
+    ORIGEN[f === 'ct' ? 'tu' : 'bc'] = b.origen || 'manual';
+    if (f === 'ct'){ COPIADO = b.copiado || ''; $('copiadoMsg').textContent = b.copiadoMsg || ''; }
+    pintarPrec(f); pintarFotos(f); alertaCurp(f === 'ct' ? 'tu' : 'bc');
+    if (Date.now() - b.t < BORR_MS && b.t > reciente){ reciente = b.t; destino = f; }
+  }
+  if (hubo) aviso('Se recuperó lo que estabas capturando.', 'ok');
+  return destino;
 }
 async function entrarAlta(f){   // si hay algo capturado a medias, se conserva al volver
   if (!sucio[f]) await reiniciar(f); else { await llenarCentros(); pintarPaso(f); }
@@ -1053,7 +1101,8 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); evInst = e; $
 $('btnInstalar').onclick = () => { if (evInst){ evInst.prompt(); evInst = null; $('btnInstalar').classList.add('oculto'); } };
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
 
-red(); ir('inicio');
+red();
+(async () => { let destino = null; try { destino = await restaurarBorradores(); } catch (e) {} ir(destino || 'inicio'); })();
 </script>
 </body>
 </html>
