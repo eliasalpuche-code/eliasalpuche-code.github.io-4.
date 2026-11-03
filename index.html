@@ -141,6 +141,14 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 <section class="pantalla" id="p-config">
   <div class="tarjeta"><div id="cfgUsuario" class="suave"></div><div class="fila"><button class="bsync">Sincronizar ahora</button></div><div class="fila"><button id="btnInstalar" class="sec oculto">Instalar app</button></div></div>
   <div class="tarjeta"><b>Pendientes de sincronizar</b><div id="cfgCola"></div></div>
+  <div class="tarjeta oculto" id="cardRespaldo"><b>Respaldos</b>
+    <p class="suave">Guardan todos los datos (centros, becarios, fotos registradas, etc.). Las fotos en sí se quedan en Drive. Solo el administrador puede usarlos y se necesita internet.</p>
+    <div class="fila"><button id="btnRespNuevo">☁ Crear respaldo en Drive</button></div>
+    <div class="fila"><button class="sec" id="btnRespArchivo">⬇ Descargar respaldo (archivo)</button></div>
+    <div class="fila"><button class="sec" id="btnRespVer">📂 Ver respaldos en Drive</button></div><div id="listaResp"></div>
+    <div class="fila"><button class="sec" id="btnRespCargar">⬆ Cargar respaldo desde archivo</button></div>
+    <input type="file" id="fileResp" accept=".json,application/json" class="oculto">
+    <p class="suave" id="respMsg"></p></div>
   <div class="tarjeta"><b>Diagnóstico</b><div id="cfgDiag" class="suave"></div><div class="fila"><button class="sec" id="btnLimpiarDiag">Borrar registro de errores</button></div></div>
   <div class="tarjeta"><button class="sec" id="btnBorrar">Borrar datos locales</button><p class="suave">Solo se puede cuando no hay pendientes. Borra la lista descargada de centros y becarios de este teléfono.</p></div>
 </section>
@@ -169,8 +177,8 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbysy3T6Lso8u1cTLzqY2DNwzoxfGkX6ow3CqCthMezx5ICDCZVIjdV595Lis6oxcn0C/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
 
 const $ = id => document.getElementById(id);
@@ -1217,7 +1225,7 @@ async function pintarInicio(){
   const n = (await dbAll('cola')).length;
   $('estadoSync').textContent = `${n} pendiente(s) por sincronizar · Última sincronización: ${(await meta('ultima')) || 'nunca'}`;
 }
-const VERSION = '2026-11-03 · exportar a Excel';
+const VERSION = '2026-11-03b · respaldos';
 async function registrarError(origen, e){   // guarda los últimos errores para poder verlos en Configuración
   try {
     const l = (await meta('errores')) || [];
@@ -1233,8 +1241,69 @@ async function pintarDiag(){
     '<br>' + (l.length ? l.map(x => esc(x.t + ' · ' + x.o + ': ' + x.m)).join('<br>') : 'Sin errores registrados.');
 }
 $('btnLimpiarDiag').onclick = async () => { await setMeta('errores', []); pintarDiag(); };
+/* ---------- Respaldos (solo administrador) ---------- */
+async function respListo(){
+  if (!navigator.onLine){ aviso('Los respaldos necesitan internet.', 'error'); return false; }
+  if (!token){ pedirLogin(); return false; }
+  return true;
+}
+const fechaArchivo = () => localISO().slice(0, 16).replace('T', '_').replace(':', '-');
+$('btnRespNuevo').onclick = async () => {
+  if (!(await respListo())) return;
+  const nota = prompt('Nota para este respaldo (opcional):', ''); if (nota === null) return;
+  aviso('Creando respaldo en Drive…', 'ok');
+  try { const r = await api('respaldoCrear', { nota }); aviso('Respaldo creado: ' + r.nombre, 'ok'); $('respMsg').textContent = 'Último respaldo: ' + r.nombre; }
+  catch (e) { registrarError('respaldo', e); aviso('No se pudo crear el respaldo: ' + e.message, 'error'); }
+};
+$('btnRespArchivo').onclick = async () => {
+  if (!(await respListo())) return;
+  aviso('Preparando el archivo de respaldo…', 'ok');
+  try {
+    const d = await api('respaldoArchivo');
+    bajarArchivo(new Blob([JSON.stringify(d)], { type: 'application/json' }), 'RESPALDO_CENTROS_BECARIOS_' + fechaArchivo() + '.json');
+    aviso(`Respaldo descargado: ${d.resumen.Centros} centros, ${d.resumen.Becarios} becarios.`, 'ok');
+  } catch (e) { registrarError('respaldo', e); aviso('No se pudo descargar el respaldo: ' + e.message, 'error'); }
+};
+async function confirmarRestauracion(detalle){
+  if ((await dbAll('cola')).length){ aviso('Hay pendientes sin sincronizar en este teléfono. Sincroniza o descártalos antes de restaurar.', 'error'); return false; }
+  const t = prompt(detalle + '\n\nEsto REEMPLAZA todos los datos actuales por los del respaldo. Antes se guarda un respaldo de seguridad en Drive. Las fotos y la lista de usuarios no se tocan.\n\nEscribe RESTAURAR para continuar:');
+  return t !== null && t.trim() === 'RESTAURAR';
+}
+async function terminarRestauracion(r){
+  aviso('Restaurado. Actualizando este teléfono…', 'ok');
+  for (const k of ['centros', 'becarios', 'fotos']) await dbDel('meta', k);
+  await sincronizar();
+  $('respMsg').textContent = r.mensaje + ' Respaldo de seguridad: ' + r.previo;
+}
+$('btnRespVer').onclick = async () => {
+  if (!(await respListo())) return;
+  try {
+    const l = await api('respaldoListar');
+    $('listaResp').innerHTML = l.length ? l.map(x => `<div class="item"><div>${esc(x.nombre)}<div class="suave">${esc(x.fecha)}</div></div><button class="sec" data-rid="${esc(x.id)}" data-rn="${esc(x.nombre)}">Restaurar</button></div>`).join('') : '<p class="suave">Todavía no hay respaldos en Drive.</p>';
+  } catch (e) { aviso('No se pudo leer la lista: ' + e.message, 'error'); }
+};
+$('listaResp').onclick = async e => {
+  const b = e.target.closest('[data-rid]'); if (!b || !(await respListo())) return;
+  if (!(await confirmarRestauracion('Vas a restaurar:\n' + b.dataset.rn))) { aviso('Restauración cancelada. No se cambió nada.', 'ok'); return; }
+  aviso('Restaurando… puede tardar un momento.', 'ok');
+  try { await terminarRestauracion(await api('respaldoRestaurar', { id: b.dataset.rid })); }
+  catch (er) { registrarError('restaurar', er); aviso('No se pudo restaurar: ' + er.message, 'error'); }
+};
+$('btnRespCargar').onclick = () => { $('fileResp').value = ''; $('fileResp').click(); };
+$('fileResp').onchange = async e => {
+  const f = e.target.files[0]; if (!f || !(await respListo())) return;
+  let d;
+  try { d = JSON.parse(await f.text()); } catch (x) { aviso('El archivo no se puede leer: no es un respaldo válido.', 'error'); return; }
+  if (!d || d.formato !== 'cb-respaldo-1' || !d.hojas){ aviso('Ese archivo no es un respaldo de esta app.', 'error'); return; }
+  const r = d.resumen || {};
+  if (!(await confirmarRestauracion(`Archivo del ${String(d.fecha || '').replace('T', ' ')}: ${r.Centros || 0} centros y ${r.Becarios || 0} becarios.`))){ aviso('Carga cancelada. No se cambió nada.', 'ok'); return; }
+  aviso('Cargando respaldo… puede tardar un momento.', 'ok');
+  try { await terminarRestauracion(await api('respaldoCargar', { formato: d.formato, fecha: d.fecha, hojas: d.hojas })); }
+  catch (er) { registrarError('restaurar', er); aviso('No se pudo cargar el respaldo: ' + er.message, 'error'); }
+};
 async function pintarConfig(){
   pintarDiag();
+  $('cardRespaldo').classList.toggle('oculto', !/\(administrador\)/.test((await meta('usuario')) || ''));
   $('cfgUsuario').textContent = 'Usuario: ' + ((await meta('usuario')) || 'sin iniciar sesión');
   const cola = (await dbAll('cola')).sort((a, b) => a.creado - b.creado);
   $('cfgCola').innerHTML = cola.length ? cola.map(o => `<div class="item"><div>${esc(o.etiqueta)}<div class="suave">${o.estado === 'error' ? 'Error: ' + esc(o.mensaje) : 'Pendiente'}</div></div><button class="sec" data-d="${esc(o.uid)}">Descartar</button></div>`).join('') : '<p class="suave">No hay pendientes.</p>';
