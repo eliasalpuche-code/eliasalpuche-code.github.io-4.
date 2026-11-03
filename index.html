@@ -97,7 +97,7 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
   <button class="grande" data-ir="bc">👥 ALTA BECARIOS<small>Registrar becario</small></button>
   <button class="grande" data-ir="consCT">📄 CONSULTA CT<small>Buscar y editar</small></button>
   <button class="grande" data-ir="consBC">📄 CONSULTA BECARIOS<small>Buscar, editar y cambiar de centro</small></button>
-  <div class="dos"><button class="sec" disabled>Exportar a Excel (próximamente)</button><button class="sec" data-ir="config">⚙ Configuración</button></div>
+  <div class="dos"><button class="sec" id="btnExcel">📊 Exportar a Excel</button><button class="sec" data-ir="config">⚙ Configuración</button></div>
   <div class="tarjeta" style="margin-top:12px"><div id="estadoSync" class="suave"></div><div class="fila"><button class="bsync">Sincronizar</button></div></div>
 </section>
 
@@ -169,9 +169,10 @@ body[data-tema="rojo"]{--azul:#8a4040;--btn:#9c4d4d;--fondo:#f8eeee;--papel:#fff
 
 <script>
 /* ====== CONFIGURACIÓN: cambia SOLO estas dos líneas ====== */
-const URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbysy3T6Lso8u1cTLzqY2DNwzoxfGkX6ow3CqCthMezx5ICDCZVIjdV595Lis6oxcn0C/exec';
-const CLIENT_ID  = '358511945807-ge74mfnui2k55qm2i1at5ih2uq9ts108.apps.googleusercontent.com';
+const URL_SCRIPT = 'PEGA_AQUI_LA_URL_EXEC';
+const CLIENT_ID  = 'PEGA_AQUI_EL_ID_DE_CLIENTE';
 /* ========================================================= */
+
 const $ = id => document.getElementById(id);
 const esc = t => { const d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML.replace(/"/g, '&quot;'); };
 const REGEX_CURP = /^[A-Z][AEIOUX][A-Z]{2}\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[HMX][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z\d]\d$/;
@@ -1085,7 +1086,8 @@ async function alIniciar(resp){
   token = resp.credential; $('modalLogin').classList.add('oculto');
   try { const u = await api('quienSoy'); await setMeta('usuario', u.nombre + ' (' + u.rol + ')'); }
   catch (e) { token = null; aviso(e.message, 'error'); return; }
-  sincronizar();
+  await sincronizar();
+  if (EXPORT_PEND){ EXPORT_PEND = false; exportarExcel(); }
 }
 let sincronizando = false;
 async function sincronizar(){
@@ -1116,12 +1118,106 @@ async function sincronizar(){
 }
 document.querySelectorAll('.bsync').forEach(b => b.onclick = sincronizar);
 
+/* ---------- Exportar a Excel: el .xlsx se arma aquí mismo (sin librerías externas) ---------- */
+let EXPORT_PEND = false;
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function armarZip(archivos){   // zip sin compresión: es lo que necesita un .xlsx
+  const enc = new TextEncoder(), partes = [], central = [];
+  const u16 = v => [v & 255, (v >> 8) & 255], u32 = v => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  let off = 0;
+  for (const a of archivos){
+    const nom = enc.encode(a.n), crc = crc32(a.d), tam = a.d.length;
+    const cab = Uint8Array.from([0x50, 0x4B, 3, 4, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(tam), ...u32(tam), ...u16(nom.length), ...u16(0)]);
+    partes.push(cab, nom, a.d);
+    central.push(Uint8Array.from([0x50, 0x4B, 1, 2, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(tam), ...u32(tam),
+      ...u16(nom.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off)]), nom);
+    off += cab.length + nom.length + tam;
+  }
+  const tamCentral = central.reduce((s, x) => s + x.length, 0);
+  const fin = Uint8Array.from([0x50, 0x4B, 5, 6, ...u16(0), ...u16(0), ...u16(archivos.length), ...u16(archivos.length), ...u32(tamCentral), ...u32(off), ...u16(0)]);
+  return new Blob([...partes, ...central, fin], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+const xesc = s => String(s == null ? '' : s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const colXL = i => { let s = ''; i++; while (i > 0){ const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+const COL_ANCHA = ['TEXTO LARGO', 'OBSERVACIONES Y COMENTARIOS'], COL_AJUSTE = ['TEXTO LARGO', 'OBSERVACIONES Y COMENTARIOS', 'REFERENCIA'];
+const estiloXL = (color, enlace, ajuste) => 2 + ({ '': 0, ROJO: 1, AMBAR: 2 }[color] || 0) * 4 + (enlace ? 2 : 0) + (ajuste ? 1 : 0);
+const ESTILOS_XL = (() => {
+  const xf = (font, fill, aj) => `<xf numFmtId="0" fontId="${font}" fillId="${fill}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"${aj ? ' wrapText="1"' : ''}/></xf>`;
+  let x = '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>';
+  for (const fill of [0, 3, 4]) for (const font of [0, 2]) for (const aj of [0, 1]) x += xf(font, fill, aj);
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0D4A8A"/><bgColor indexed="64"/></patternFill></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFF4C7C3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFCE5B0"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+    '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFD3DBE6"/></left><right style="thin"><color rgb="FFD3DBE6"/></right><top style="thin"><color rgb="FFD3DBE6"/></top><bottom style="thin"><color rgb="FFD3DBE6"/></bottom><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    `<cellXfs count="14">${x}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+})();
+function hojaXL(hoja){
+  const { encabezados: enc, filas, colores } = hoja, n = filas.length + 1;
+  const ancho = enc.map((t, c) => COL_ANCHA.includes(t) ? 55 : Math.max(t.length + 2, 10, Math.min(42, Math.max(0, ...filas.map(f => { const v = f[c]; return String(v && v.x !== undefined ? v.x : v || '').length + 2; })))));
+  let x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<sheetViews><sheetView workbookViewId="0"><pane xSplit="1" ySplit="1" topLeftCell="B2" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>' +
+    '<cols>' + ancho.map((a, i) => `<col min="${i + 1}" max="${i + 1}" width="${a}" customWidth="1"/>`).join('') + '</cols><sheetData>';
+  x += '<row r="1" ht="34" customHeight="1">' + enc.map((t, c) => `<c r="${colXL(c)}1" s="1" t="inlineStr"><is><t>${xesc(t)}</t></is></c>`).join('') + '</row>';
+  filas.forEach((f, i) => {
+    const r = i + 2;
+    x += `<row r="${r}">` + enc.map((t, c) => {
+      const v = f[c], ref = colXL(c) + r, aj = COL_AJUSTE.includes(t);
+      if (v && v.u){ const tx = xesc(v.x || v.u), url = xesc(v.u).replace(/&quot;/g, '""'); return `<c r="${ref}" s="${estiloXL(colores[i], true, false)}" t="str"><f>HYPERLINK("${url}","${tx}")</f><v>${tx}</v></c>`; }
+      const s = estiloXL(colores[i], false, aj);
+      return v === '' || v == null ? `<c r="${ref}" s="${s}"/>` : `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xesc(v)}</t></is></c>`;
+    }).join('') + '</row>';
+  });
+  return x + `</sheetData><autoFilter ref="A1:${colXL(enc.length - 1)}${n}"/></worksheet>`;
+}
+function armarXlsx(hojas){
+  const e = new TextEncoder(), A = (n, s) => ({ n, d: e.encode(s) }), cab = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  return armarZip([
+    A('[Content_Types].xml', cab + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      hojas.map((h, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'),
+    A('_rels/.rels', cab + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
+    A('xl/workbook.xml', cab + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+      hojas.map((h, i) => `<sheet name="${xesc(h.nombre)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>'),
+    A('xl/_rels/workbook.xml.rels', cab + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      hojas.map((h, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('') +
+      `<Relationship Id="rId${hojas.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`),
+    A('xl/styles.xml', ESTILOS_XL),
+    ...hojas.map((h, i) => A(`xl/worksheets/sheet${i + 1}.xml`, hojaXL(h)))
+  ]);
+}
+function bajarArchivo(blob, nombre){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+}
+async function exportarExcel(){
+  if (!navigator.onLine){ aviso('Para exportar se necesita internet: el Excel se arma con los datos del servidor.', 'error'); return; }
+  if (!token){ EXPORT_PEND = true; pedirLogin(); return; }
+  if ((await dbAll('cola')).length){
+    await sincronizar();
+    const quedan = (await dbAll('cola')).length;
+    if (quedan && !confirm(`Quedan ${quedan} pendiente(s) sin enviar (con error). No saldrán en el Excel. ¿Exportar de todos modos?`)) return;
+  }
+  aviso('Preparando el Excel…', 'ok');
+  try {
+    const d = await api('exportar');
+    const f = localISO().slice(0, 10);
+    bajarArchivo(armarXlsx(d.hojas), 'CENTROS_Y_BECARIOS_' + f + '.xlsx');
+    aviso(`Excel listo: ${d.hojas[0].filas.length} centros y ${d.hojas[1].filas.length} becarios.` + (d.avisos.length ? ' ' + d.avisos.join(' ') : ''), d.avisos.length ? 'error' : 'ok');
+  } catch (e) { registrarError('exportar', e); aviso('No se pudo exportar: ' + e.message, 'error'); }
+}
+$('btnExcel').onclick = exportarExcel;
+
 /* ---------- Inicio y configuración ---------- */
 async function pintarInicio(){
   const n = (await dbAll('cola')).length;
   $('estadoSync').textContent = `${n} pendiente(s) por sincronizar · Última sincronización: ${(await meta('ultima')) || 'nunca'}`;
 }
-const VERSION = '2026-11-02c · errores visibles';
+const VERSION = '2026-11-03 · exportar a Excel';
 async function registrarError(origen, e){   // guarda los últimos errores para poder verlos en Configuración
   try {
     const l = (await meta('errores')) || [];
